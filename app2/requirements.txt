@@ -1,0 +1,5 @@
+Flask
+pika
+Flask-SQLAlchemy
+mysql-connector-python
+WeasyPrint
