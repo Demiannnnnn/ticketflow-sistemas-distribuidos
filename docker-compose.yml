@@ -210,19 +210,19 @@ services:
 
   # ========================================
   # APP3 - Portal de Venta (Python)
-  # ESTADO: Por implementar
-  # Descomentar cuando ./app3_portal esté listo
   # ========================================
-  # app3_portal:
-  #   build: ./app3_portal
-  #   container_name: ticketflow_app3
-  #   ports:
-  #     - "5003:5003"
-  #   depends_on:
-  #     - middleware
-  #   networks:
-  #     - ticketflow_network
-  #   restart: unless-stopped
+  app3:
+    build: ./app3
+    container_name: ticketflow_app3
+    ports:
+      - "5003:5000"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - rabbitmq
+    networks:
+      - ticketflow_network
+    restart: unless-stopped
 
   # ========================================
   # MIDDLEWARE - Orquestador (Go + RabbitMQ)
