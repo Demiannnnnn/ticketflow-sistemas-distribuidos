@@ -10,7 +10,7 @@ services:
   # APP1 - LOAD BALANCER (NGINX)
   # ========================================
   nginx:
-    image: nginx:alpine.
+    image: nginx:alpine
     container_name: app1_nginx_lb
     ports:
       - "8083:80"
