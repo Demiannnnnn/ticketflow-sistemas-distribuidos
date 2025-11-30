@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}My Tickets - Ticket System{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">My Tickets</h2>
+
+{% if tickets %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>ID</th>
+                <th>Event</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ticket in tickets %}
+            <tr>
+                <td>{{ ticket.external_id }}</td>
+                <td>{{ ticket.event_name }}</td>
+                <td>${{ ticket.price }}</td>
+                <td>
+                    <span class="badge 
+                        {% if ticket.status.value == 'PENDING_PAYMENT' %}bg-warning text-dark
+                        {% elif ticket.status.value == 'PAID' %}bg-success
+                        {% elif ticket.status.value == 'USED' %}bg-secondary
+                        {% elif ticket.status.value == 'REFUNDED' %}bg-danger
+                        {% endif %}">
+                        {{ ticket.status.value }}
+                    </span>
+                </td>
+                <td>
+                    <div class="btn-group" role="group">
+                        {% if ticket.status.value == 'PENDING_PAYMENT' %}
+                        <form action="{{ url_for('ticket.pay_ticket', ticket_id=ticket.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-primary">Pay</button>
+                        </form>
+                        {% endif %}
+
+                        {% if ticket.status.value == 'PAID' %}
+                        <form action="{{ url_for('ticket.use_ticket', ticket_id=ticket.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-info text-white">Use</button>
+                        </form>
+                        <form action="{{ url_for('ticket.refund_ticket', ticket_id=ticket.id) }}" method="POST" style="display:inline; margin-left: 5px;">
+                            <button type="submit" class="btn btn-sm btn-danger">Refund</button>
+                        </form>
+                        {% endif %}
+                        
+                        {% if ticket.status.value == 'USED' or ticket.status.value == 'REFUNDED' %}
+                        <button class="btn btn-sm btn-secondary" disabled>No Actions</button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">
+    You have no tickets yet. Wait for incoming tickets from the middleware!
+</div>
+{% endif %}
+{% endblock %}

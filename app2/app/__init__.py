@@ -1,20 +1,34 @@
 from flask import Flask
-from config import Config
-# Extensions can be initialized here, for example:
-# from flask_sqlalchemy import SQLAlchemy
+from .config import Config
+from .models import db
 
-# db = SQLAlchemy()
-
-def create_app():
+def create_app(config_class=Config):
     app = Flask(__name__)
-    app.config.from_object(Config)
+    app.config.from_object(config_class)
 
-    # db.init_app(app)
+    db.init_app(app)
+
+    from .routes import auth_bp, ticket_bp
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(ticket_bp)
 
     with app.app_context():
-        from . import routes
-        # In a real scenario, you would initialize the consumer here
-        # from . import consumer
-        # consumer.start_consuming()
+        # Retry logic for DB connection
+        import time
+        from sqlalchemy.exc import OperationalError
+        
+        retries = 10
+        while retries > 0:
+            try:
+                db.create_all()
+                print("Database connection successful and tables created.")
+                break
+            except OperationalError as e:
+                retries -= 1
+                print(f"Database not ready yet, retrying in 5 seconds... ({retries} retries left)")
+                time.sleep(5)
+                if retries == 0:
+                    print("Could not connect to database after multiple attempts.")
+                    raise e
 
     return app
