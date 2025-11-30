@@ -1,0 +1,117 @@
+@startuml
+
+!theme plain
+hide empty members
+
+' Definición de Estilos y Paquetes
+package "Base de Datos (Models)" {
+    class User <<SQLAlchemy Model>> {
+        +Integer id
+        +String username
+        +String email
+        +String password_hash
+        +check_password(password)
+        +set_password(password)
+    }
+
+    class Ticket <<SQLAlchemy Model>> {
+        +Integer id
+        +String external_id
+        +Float price
+        +String event_name
+        +DateTime created_at
+        +DateTime updated_at
+        +TicketStatus status
+        +Integer user_id
+    }
+
+    class Payment <<SQLAlchemy Model>> {
+        +Integer id
+        +Float amount
+        +DateTime paid_at
+        +String payment_method
+        +Integer ticket_id
+    }
+}
+
+package "Lógica de Negocio (Services)" {
+    class AuthService {
+        +login(email, password): User
+        +register(email, username, password): User
+    }
+
+    class TicketService {
+        +receive_external_ticket(json_data): Ticket
+        +process_payment(user, ticket_id): bool
+        +use_ticket(user, ticket_id): bool
+        +refund_ticket(user, ticket_id): bool
+        +get_user_tickets(user_id): List[Ticket]
+    }
+    
+    class PaymentGateway {
+        +charge_credit_card(amount, token): bool
+        +refund_transaction(transaction_id): bool
+    }
+}
+
+package "Interfaz Web & API (Flask Routes)" {
+    class AuthController <<Blueprint>> {
+        +GET/POST /login()
+        +GET/POST /register()
+        +GET /logout()
+    }
+
+    class TicketController <<Blueprint>> {
+        +GET /my-tickets()
+        +POST /pay-ticket/<id>()
+        +POST /refund-ticket/<id>()
+        +POST /use-ticket/<id>()
+    }
+
+    class TicketSocketListener <<Socket Client/Listener>> {
+        +connect_to_middleware()
+        +listen_loop()
+        +on_ticket_received_event(data)
+    }
+}
+
+package "Enumeradores" {
+    enum TicketStatus {
+        PENDING_PAYMENT
+        PAID
+        USED
+        REFUNDED
+    }
+}
+
+' Relaciones entre Modelos
+User "1" -- "*" Ticket : "tiene"
+Ticket "1" -- "0..1" Payment : "genera"
+Ticket "1" -r- "1" TicketStatus : "tiene estado"
+
+' Relaciones de Dependencia (Flujo de la App)
+AuthController ..> AuthService : "usa"
+TicketSocketListener ..> TicketService : "invoca al recibir datos"
+TicketController ..> TicketService : "usa"
+
+' Relaciones de Servicios a Modelos
+AuthService ..> User : "consulta/crea"
+TicketService ..> Ticket : "gestiona"
+TicketService ..> Payment : "registra"
+TicketService ..> PaymentGateway : "procesa pagos"
+
+note right of TicketSocketListener
+  Mantiene conexión persistente
+  con el Middleware. Al recibir
+  un evento 'new_ticket', llama
+  al TicketService.
+end note
+
+note right of TicketService
+  Aquí reside la lógica compleja:
+  - Validar si el ticket ya se usó
+  - Verificar fechas para devolución
+  - Cambiar estados
+end note
+
+@enduml
