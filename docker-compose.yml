@@ -226,19 +226,19 @@ services:
 
   # ========================================
   # MIDDLEWARE - Orquestador (Go + RabbitMQ)
-  # ESTADO: Por implementar
-  # Descomentar cuando ./middleware esté listo
   # ========================================
-  # middleware:
-  #   build: ./middleware
-  #   container_name: ticketflow_middleware
-  #   ports:
-  #     - "8000:8000"
-  #   depends_on:
-  #     - rabbitmq
-  #   networks:
-  #     - ticketflow_network
-  #   restart: unless-stopped
+  middleware:
+    build: ./middleware
+    container_name: ticketflow_middleware
+    ports:
+      - "8000:8000"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - rabbitmq
+    networks:
+      - ticketflow_network
+    restart: unless-stopped
 
 networks:
   ticketflow_network:
