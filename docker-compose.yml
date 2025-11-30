@@ -32,38 +32,5 @@ services:
       - "5672:5672"
       - "15672:15672"
 
-  app1_reserves:
-    build: ./app1_reserves # You will need to create a Dockerfile in app1_reserves
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-
-  postgres:
-    image: postgres:13
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=reserves
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  app3_portal:
-    build: ./app3_portal # You will need to create a Dockerfile in app3_portal
-    ports:
-      - "5003:5003"
-    depends_on:
-      - middleware
-
-  middleware:
-    build: ./middleware # You will need to create a Dockerfile in middleware
-    ports:
-      - "8000:8000"
-    depends_on:
-      - rabbitmq
-
 volumes:
   mariadb_data:
-  postgres_data:
