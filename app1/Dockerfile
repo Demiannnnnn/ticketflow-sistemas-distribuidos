@@ -27,7 +27,7 @@ COPY --from=builder /app/main .
 
 # Copiar frontend
 COPY frontend/ ./frontend/
-COPY static/ ./static/
+# COPY static/ ./static/
 
 # Exponer puerto
 EXPOSE 8080
