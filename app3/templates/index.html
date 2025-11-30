@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TicketFlow - Portal de Venta</title>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f4f4f9; }
+        .container { text-align: center; }
+        button { background-color: #007bff; color: white; border: none; padding: 15px 30px; font-size: 16px; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        #message { margin-top: 20px; font-size: 18px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bienvenido a TicketFlow</h1>
+        <button onclick="comprarTicket()">Comprar Ticket</button>
+        <div id="message"></div>
+    </div>
+
+    <script>
+        function comprarTicket() {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = 'Procesando compra...';
+
+            fetch('/comprar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                // Simulamos el envío de datos de una compra
+                body: JSON.stringify({ evento_id: 'evento_123', usuario_id: 'usuario_456' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                messageDiv.textContent = data.mensaje;
+                messageDiv.style.color = 'green';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                messageDiv.textContent = 'Error al procesar la compra. Intente de nuevo.';
+                messageDiv.style.color = 'red';
+            });
+        }
+    </script>
+</body>
+</html>
