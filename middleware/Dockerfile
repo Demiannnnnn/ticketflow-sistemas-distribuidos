@@ -5,12 +5,12 @@ WORKDIR /app
 
 # Copiar archivos de dependencias y descargar dependencias
 COPY go.mod go.sum ./
-RUN go mod tidy
-RUN go mod download
-
 
 # Copiar código fuente
 COPY . .
+
+RUN go mod tidy
+RUN go mod download
 
 # Compilar la aplicación
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o middleware .
