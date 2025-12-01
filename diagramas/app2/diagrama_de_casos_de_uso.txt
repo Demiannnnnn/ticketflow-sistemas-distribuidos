@@ -1,0 +1,31 @@
+@startuml
+
+actor Cliente
+actor Middleware
+
+rectangle "App2 (Ticketera)" {
+    (Recibir info para ticket)
+    (Logearse)
+    (Registrarse)
+    (Consultar Tickets por pagar)
+    (Pagar ticket)
+    (Enviar ticket)
+    (Registrarse)
+    (Consultar ticket comprados)
+    (Devolver ticket)
+}
+
+
+Cliente -> (Logearse)
+Cliente -> (Registrarse)
+
+Middleware ->  (Recibir info para ticket)
+
+(Logearse) ..> (Consultar Tickets por pagar): <<extend>>
+(Logearse) ..> (Consultar ticket comprados): <<extend>>
+(Consultar ticket comprados) ..> (Devolver ticket): <<extend>>
+
+(Consultar Tickets por pagar) ..> (Pagar ticket) : <<extend>>
+(Pagar ticket) ..> (Enviar ticket) : <<include>>
+
+@enduml
