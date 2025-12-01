@@ -1,18 +1,35 @@
 import os
 import pika
 import json
+import requests
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
-# Configuración de RabbitMQ (idealmente, usar variables de entorno)
+# URLs de servicios
+APP1_API_URL = "http://nginx/api/events"
+
+# Configuración de RabbitMQ
 RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'localhost')
 RABBITMQ_QUEUE = 'orden_creada'
 
 @app.route('/')
 def index():
-    """Renderiza la página principal."""
-    return render_template('index.html')
+    """
+    Renderiza la página principal con la lista de eventos de App1.
+    """
+    events = []
+    error_message = None
+    try:
+        response = requests.get(APP1_API_URL, timeout=5)
+        response.raise_for_status()  # Lanza un error para respuestas 4xx/5xx
+        data = response.json()
+        events = data.get('events', [])
+    except requests.exceptions.RequestException as e:
+        print(f"Error al conectar con App1: {e}")
+        error_message = "No se pudo cargar la lista de eventos. El servicio de App1 podría no estar disponible."
+    
+    return render_template('index.html', events=events, error_message=error_message)
 
 @app.route('/comprar', methods=['POST'])
 def comprar():
