@@ -1,0 +1,34 @@
+@startuml
+autonumber
+title Secuencia: Recepción de Ticket desde Middleware
+
+actor "Middleware" as MW
+participant "TicketSocketListener" as Listener
+participant "TicketService" as Service
+participant "Ticket (Model)" as Model
+database "Base de Datos" as DB
+
+activate Listener
+    Note right of Listener: Escucha eventos 'new_ticket' [cite: 7]
+    MW ->> Listener: Enviar JSON (datos del ticket)
+    
+    Listener -> Service: receive_external_ticket(json_data) [cite: 4]
+    activate Service
+    
+        Service -> Service: Validar estructura JSON
+        
+        create Model
+        Service -> Model: Crear instancia (status=PENDING_PAYMENT) 
+        
+        Service -> DB: Guardar (Commit)
+        activate DB
+        DB --> Service: Confirmación ID
+        deactivate DB
+        
+    Service --> Listener: Ticket creado
+    deactivate Service
+
+    Listener -->> MW: Acknowledge (OK)
+deactivate Listener
+
+@enduml

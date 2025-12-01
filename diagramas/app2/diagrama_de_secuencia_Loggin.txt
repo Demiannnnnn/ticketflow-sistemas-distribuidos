@@ -1,0 +1,45 @@
+@startuml
+autonumber
+title Secuencia: Login de Usuario
+
+actor "Cliente" as UserActor
+participant "AuthController" as Controller
+participant "AuthService" as Service
+participant "User (Model)" as UserModel
+database "Base de Datos" as DB
+
+UserActor -> Controller: POST /login (email, password)
+activate Controller
+
+    Controller -> Service: login(email, password)
+    activate Service
+    
+        Service -> DB: Buscar usuario por email
+        activate DB
+        DB --> Service: Objeto User (o null)
+        deactivate DB
+        
+        alt Usuario Encontrado
+            Service -> UserModel: check_password(password)
+            activate UserModel
+            UserModel --> Service: True/False
+            deactivate UserModel
+            
+            alt Contraseña Correcta
+                Service --> Controller: Retorna User (Exitoso)
+                Controller -> Controller: Generar Token/Sesión
+                Controller --> UserActor: 200 OK (Token/Datos)
+            else Contraseña Incorrecta
+                Service --> Controller: Retorna Error / Null
+                Controller --> UserActor: 401 Unauthorized (Credenciales inválidas)
+            end
+            
+        else Usuario No Existe
+            Service --> Controller: Retorna Error / Null
+            Controller --> UserActor: 401 Unauthorized (Usuario no encontrado)
+        end
+        
+    deactivate Service
+
+deactivate Controller
+@enduml

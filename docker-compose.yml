@@ -4,10 +4,9 @@ services:
   app2:
     build: ./app2
     ports:
-      - "5002:5002"
-    environment:
-      - DATABASE_URL=mysql+mysqlconnector://user:password@mariadb/***REMOVED***
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - "${APP2_RUN_PORT}:5002"
+    env_file:
+      - .env
     volumes:
       - ./app2:/usr/src/app
     depends_on:
@@ -15,12 +14,12 @@ services:
       - rabbitmq
 
   mariadb:
-    image: mariadb:10.5
+    build: ./mariadb
     environment:
-      - MYSQL_ROOT_PASSWORD=***REMOVED***
-      - MYSQL_DATABASE=***REMOVED***
-      - MYSQL_USER=user
-      - MYSQL_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${APP2_DB_NAME}
+      - MYSQL_USER=${APP2_DB_USER}
+      - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
     ports:
       - "3306:3306"
     volumes:

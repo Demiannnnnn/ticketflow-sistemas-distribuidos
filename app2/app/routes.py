@@ -10,19 +10,27 @@ ticket_bp = Blueprint('ticket', __name__)
 def register():
     if request.method == 'POST':
         email = request.form.get('email')
-        username = request.form.get('username')
+        rut = request.form.get('rut')
+        full_name = request.form.get('full_name')
         password = request.form.get('password')
         
-        if not email or not username or not password:
+        if not email or not rut or not full_name or not password:
             flash('Missing data', 'danger')
             return render_template('register.html')
             
-        user = AuthService.register(email, username, password)
+        # Basic RUT validation (could be improved)
+        try:
+            rut_int = int(rut)
+        except ValueError:
+            flash('RUT must be a number', 'danger')
+            return render_template('register.html')
+
+        user = AuthService.register(rut_int, email, full_name, password)
         if user:
             flash('User registered successfully! Please login.', 'success')
             return redirect(url_for('auth.login'))
         else:
-            flash('User already exists', 'danger')
+            flash('User already exists or email taken', 'danger')
     
     return render_template('register.html')
 
@@ -34,8 +42,8 @@ def login():
         
         user = AuthService.login(email, password)
         if user:
-            session['user_id'] = user.id
-            flash(f'Welcome back, {user.username}!', 'success')
+            session['user_rut'] = user.rut
+            flash(f'Welcome back, {user.full_name}!', 'success')
             return redirect(url_for('ticket.my_tickets'))
         else:
             flash('Invalid credentials', 'danger')
@@ -44,7 +52,7 @@ def login():
 
 @auth_bp.route('/logout')
 def logout():
-    session.pop('user_id', None)
+    session.pop('user_rut', None)
     flash('Logged out successfully.', 'info')
     return redirect(url_for('auth.login'))
 
@@ -52,35 +60,35 @@ def logout():
 
 @ticket_bp.before_request
 def load_logged_in_user():
-    user_id = session.get('user_id')
-    if user_id is None:
-        g.user_id = None
+    user_rut = session.get('user_rut')
+    if user_rut is None:
+        g.user_rut = None
     else:
-        g.user_id = user_id
+        g.user_rut = user_rut
 
 @ticket_bp.route('/', methods=['GET'])
 def index():
-    if g.user_id:
+    if g.user_rut:
         return redirect(url_for('ticket.my_tickets'))
     return redirect(url_for('auth.login'))
 
 @ticket_bp.route('/my-tickets', methods=['GET'])
 def my_tickets():
-    if g.user_id is None:
+    if g.user_rut is None:
         flash('Please login to view your tickets', 'warning')
         return redirect(url_for('auth.login'))
         
-    tickets = TicketService.get_user_tickets(g.user_id)
+    tickets = TicketService.get_user_tickets(g.user_rut)
     # Pass the enum objects or values to the template if needed, 
     # but simpler to just pass the ticket objects.
     return render_template('my_tickets.html', tickets=tickets)
 
 @ticket_bp.route('/pay-ticket/<int:ticket_id>', methods=['POST'])
 def pay_ticket(ticket_id):
-    if g.user_id is None:
+    if g.user_rut is None:
         return redirect(url_for('auth.login'))
         
-    success = TicketService.process_payment(g.user_id, ticket_id)
+    success = TicketService.process_payment(g.user_rut, ticket_id)
     if success:
         flash('Payment successful!', 'success')
     else:
@@ -89,10 +97,10 @@ def pay_ticket(ticket_id):
 
 @ticket_bp.route('/refund-ticket/<int:ticket_id>', methods=['POST'])
 def refund_ticket(ticket_id):
-    if g.user_id is None:
+    if g.user_rut is None:
         return redirect(url_for('auth.login'))
         
-    success = TicketService.refund_ticket(g.user_id, ticket_id)
+    success = TicketService.refund_ticket(g.user_rut, ticket_id)
     if success:
         flash('Refund processed successfully.', 'success')
     else:
@@ -101,10 +109,10 @@ def refund_ticket(ticket_id):
 
 @ticket_bp.route('/use-ticket/<int:ticket_id>', methods=['POST'])
 def use_ticket(ticket_id):
-    if g.user_id is None:
+    if g.user_rut is None:
         return redirect(url_for('auth.login'))
         
-    success = TicketService.use_ticket(g.user_id, ticket_id)
+    success = TicketService.use_ticket(g.user_rut, ticket_id)
     if success:
         flash('Ticket used! Enjoy the event.', 'success')
     else:

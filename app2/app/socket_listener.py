@@ -1,14 +1,15 @@
 import json
 import pika
 import time
+import os
 from .services import TicketService
 from .models import db
 from flask import current_app
 
 class TicketSocketListener:
-    def __init__(self, host='rabbitmq', queue_name='new_ticket'):
-        self.host = host
-        self.queue_name = queue_name
+    def __init__(self, host=None, queue_name=None):
+        self.host = host or os.environ.get('APP2_RABBITMQ_HOST', 'rabbitmq')
+        self.queue_name = queue_name or os.environ.get('APP2_RABBITMQ_QUEUE', 'new_ticket')
         self.connection = None
         self.channel = None
 

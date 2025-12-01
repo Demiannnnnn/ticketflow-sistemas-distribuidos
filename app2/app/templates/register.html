@@ -10,8 +10,12 @@
             <div class="card-body">
                 <form method="POST" action="{{ url_for('auth.register') }}">
                     <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
+                        <label for="rut" class="form-label">RUT (without verification digit or dots)</label>
+                        <input type="number" class="form-control" id="rut" name="rut" placeholder="12345678" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="full_name" class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Juan Pérez" required>
                     </div>
                     <div class="mb-3">
                         <label for="email" class="form-label">Email address</label>

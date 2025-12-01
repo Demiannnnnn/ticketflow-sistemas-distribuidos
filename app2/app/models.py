@@ -13,10 +13,10 @@ class TicketStatus(enum.Enum):
 
 class User(db.Model):
     __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
+    rut = db.Column(db.Integer, primary_key=True, autoincrement=False)
+    full_name = db.Column(db.String(128), nullable=False, default='Usuario Pendiente')
+    email = db.Column(db.String(120), unique=True, nullable=True)
+    password_hash = db.Column(db.String(255), nullable=True)
     
     # Relación con Tickets
     tickets = db.relationship('Ticket', backref='user', lazy=True)
@@ -37,7 +37,7 @@ class Ticket(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     status = db.Column(db.Enum(TicketStatus), default=TicketStatus.PENDING_PAYMENT)
     
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_rut = db.Column(db.Integer, db.ForeignKey('users.rut'), nullable=False)
     
     # Relación con Payment (0..1)
     payment = db.relationship('Payment', backref='ticket', uselist=False, lazy=True)

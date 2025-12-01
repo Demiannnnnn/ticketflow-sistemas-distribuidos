@@ -6,7 +6,7 @@ hide empty members
 ' Definición de Estilos y Paquetes
 package "Base de Datos (Models)" {
     class User <<SQLAlchemy Model>> {
-        +Integer id
+        +Integer rut
         +String username
         +String email
         +String password_hash
@@ -22,7 +22,7 @@ package "Base de Datos (Models)" {
         +DateTime created_at
         +DateTime updated_at
         +TicketStatus status
-        +Integer user_id
+        +Integer user_rut
     }
 
     class Payment <<SQLAlchemy Model>> {

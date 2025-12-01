@@ -18,16 +18,34 @@ class AuthService:
     @staticmethod
     def login(email, password):
         user = User.query.filter_by(email=email).first()
-        if user and user.check_password(password):
+        # Verificar que exista, que tenga password setead (no sea placeholder) y que el password coincida
+        if user and user.password_hash and user.check_password(password):
             return user
         return None
 
     @staticmethod
-    def register(email, username, password):
-        if User.query.filter_by(email=email).first():
-            return None # User already exists
+    def register(rut, email, full_name, password):
+        # Verificar si existe por RUT primero
+        existing_user = User.query.filter_by(rut=rut).first()
         
-        new_user = User(email=email, username=username)
+        if existing_user:
+            if existing_user.password_hash:
+                # Ya está registrado completamente
+                return None
+            else:
+                # Es un usuario Placeholder (creado por un ticket previo)
+                # Actualizamos sus datos para "activar" la cuenta
+                existing_user.email = email
+                existing_user.full_name = full_name
+                existing_user.set_password(password)
+                db.session.commit()
+                return existing_user
+        
+        # Verificar si el email ya está en uso por OTRO usuario (aunque el RUT sea nuevo)
+        if User.query.filter_by(email=email).first():
+            return None
+        
+        new_user = User(rut=rut, email=email, full_name=full_name)
         new_user.set_password(password)
         db.session.add(new_user)
         db.session.commit()
@@ -36,19 +54,23 @@ class AuthService:
 class TicketService:
     @staticmethod
     def receive_external_ticket(json_data):
-        # Se asume que json_data trae info del ticket y tal vez del usuario
-        # Por simplicidad, si el usuario no existe, se asigna a un usuario default o se crea
-        # Aquí asumiremos que 'user_id' viene en el json o similar, o buscaremos por username
-        
+        # Datos esperados: id, price, event, rut (obligatorio ahora)
         external_id = json_data.get('id')
         price = json_data.get('price')
         event_name = json_data.get('event', 'Unknown Event')
-        username = json_data.get('username', 'guest') # Simplificación
+        user_rut = json_data.get('rut')
         
-        user = User.query.filter_by(username=username).first()
+        if not user_rut:
+            print("Error: Ticket received without RUT")
+            return None
+        
+        user = User.query.filter_by(rut=user_rut).first()
         if not user:
-            # Crear usuario al vuelo si no existe, para que el ticket tenga dueño
-            user = AuthService.register(f"{username}@example.com", username, "default123")
+            # Crear usuario Placeholder (sin email/password) para vincular el ticket
+            # Cuando el usuario real se registre con este RUT, tomará posesión de estos tickets.
+            user = User(rut=user_rut, full_name="Usuario Pendiente")
+            db.session.add(user)
+            db.session.commit()
         
         existing_ticket = Ticket.query.filter_by(external_id=external_id).first()
         if existing_ticket:
@@ -58,7 +80,7 @@ class TicketService:
             external_id=external_id,
             price=float(price),
             event_name=event_name,
-            user_id=user.id,
+            user_rut=user.rut,
             status=TicketStatus.PENDING_PAYMENT
         )
         db.session.add(new_ticket)
@@ -66,8 +88,8 @@ class TicketService:
         return new_ticket
 
     @staticmethod
-    def process_payment(user_id, ticket_id, payment_token="dummy_token"):
-        ticket = Ticket.query.filter_by(id=ticket_id, user_id=user_id).first()
+    def process_payment(user_rut, ticket_id, payment_token="dummy_token"):
+        ticket = Ticket.query.filter_by(id=ticket_id, user_rut=user_rut).first()
         if not ticket:
             return False
         
@@ -87,8 +109,8 @@ class TicketService:
         return False
 
     @staticmethod
-    def use_ticket(user_id, ticket_id):
-        ticket = Ticket.query.filter_by(id=ticket_id, user_id=user_id).first()
+    def use_ticket(user_rut, ticket_id):
+        ticket = Ticket.query.filter_by(id=ticket_id, user_rut=user_rut).first()
         if not ticket:
             return False
         
@@ -99,8 +121,8 @@ class TicketService:
         return False
 
     @staticmethod
-    def refund_ticket(user_id, ticket_id):
-        ticket = Ticket.query.filter_by(id=ticket_id, user_id=user_id).first()
+    def refund_ticket(user_rut, ticket_id):
+        ticket = Ticket.query.filter_by(id=ticket_id, user_rut=user_rut).first()
         if not ticket or not ticket.payment:
             return False
         
@@ -113,5 +135,5 @@ class TicketService:
         return False
 
     @staticmethod
-    def get_user_tickets(user_id):
-        return Ticket.query.filter_by(user_id=user_id).all()
+    def get_user_tickets(user_rut):
+        return Ticket.query.filter_by(user_rut=user_rut).all()

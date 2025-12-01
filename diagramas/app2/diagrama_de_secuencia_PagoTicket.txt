@@ -1,0 +1,53 @@
+@startuml
+autonumber
+title Secuencia: Pago de Ticket
+
+actor "Cliente" as User
+participant "TicketController" as Controller
+participant "TicketService" as Service
+participant "PaymentGateway" as Gateway
+participant "Payment (Model)" as PayModel
+participant "Ticket (Model)" as TicketModel
+database "Base de Datos" as DB
+
+User -> Controller: POST /pay-ticket/<id> 
+activate Controller
+
+    Controller -> Service: process_payment(user, ticket_id) [cite: 4]
+    activate Service
+    
+        Service -> DB: Buscar Ticket por ID
+        activate DB
+        DB --> Service: Retorna Ticket
+        deactivate DB
+        
+        Service -> Service: Verificar status == PENDING_PAYMENT 
+        
+        group Procesamiento de Pago
+            Service -> Gateway: charge_credit_card(amount, token) [cite: 4]
+            activate Gateway
+            Gateway --> Service: bool (Exitoso)
+            deactivate Gateway
+        end
+        
+        alt Pago Exitoso
+            create PayModel
+            Service -> PayModel: Crear registro de pago [cite: 3]
+            Service -> TicketModel: set status = PAID 
+            
+            Service -> DB: Actualizar Ticket y Guardar Pago
+            activate DB
+            DB --> Service: OK
+            deactivate DB
+            
+            Service --> Controller: True (Pago completado)
+        else Pago Fallido
+            Service --> Controller: False (Error)
+        end
+        
+    deactivate Service
+
+    Controller --> User: Respuesta HTTP (200 OK / 400 Error)
+
+deactivate Controller
+@enduml
