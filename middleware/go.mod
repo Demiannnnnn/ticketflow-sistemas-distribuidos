@@ -6,3 +6,5 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/rabbitmq/amqp091-go v1.9.0
 )
+
+# Cache invalidation comment
