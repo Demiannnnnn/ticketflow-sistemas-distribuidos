@@ -31,6 +31,41 @@ def index():
     
     return render_template('index.html', events=events, error_message=error_message)
 
+@app.route('/evento/<int:event_id>/asientos')
+def ver_asientos(event_id):
+    """
+    Muestra los asientos para un evento específico.
+    """
+    event = None
+    seats = []
+    error_message = None
+    
+    try:
+        # Obtener detalles del evento (necesitamos el nombre, etc.)
+        # Ineficiente, pero la API de App1 no tiene un endpoint para un solo evento.
+        all_events_response = requests.get(APP1_API_URL, timeout=5)
+        all_events_response.raise_for_status()
+        all_events = all_events_response.json().get('events', [])
+        for e in all_events:
+            if e.get('id') == event_id:
+                event = e
+                break
+        
+        if not event:
+            error_message = "El evento especificado no fue encontrado."
+        else:
+            # Obtener los asientos para el evento
+            seats_response = requests.get(f"http://nginx/api/events/{event_id}/seats", timeout=5)
+            seats_response.raise_for_status()
+            seats = seats_response.json().get('seats', [])
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error al conectar con App1 para obtener asientos: {e}")
+        error_message = "No se pudo cargar la información de los asientos."
+
+    return render_template('seats.html', event=event, seats=seats, error_message=error_message)
+
+
 @app.route('/comprar', methods=['POST'])
 def comprar():
     """
