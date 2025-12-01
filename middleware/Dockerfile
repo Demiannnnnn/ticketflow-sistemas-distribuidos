@@ -6,6 +6,7 @@ WORKDIR /app
 # Copiar archivos de dependencias y descargar dependencias
 COPY go.mod go.sum ./
 RUN go mod download
+RUN go mod tidy
 
 # Copiar código fuente
 COPY . .
