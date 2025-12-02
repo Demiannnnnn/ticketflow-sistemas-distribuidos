@@ -43,6 +43,13 @@ Sistema distribuido de venta de tickets que desacopla la reserva de asientos (cr
 
 ## 🚀 Inicio Rápido
 
+### Configuración Inicial
+
+```bash
+# Copiar archivo de configuración
+cp .env.example .env
+```
+
 ### Iniciar todo el sistema
 
 ```bash
@@ -65,6 +72,9 @@ docker-compose logs -f
 # Solo App1
 docker-compose logs -f app1_replica1 app1_replica2 nginx
 
+# Solo App2
+docker-compose logs -f app2
+
 # Solo PostgreSQL
 docker-compose logs -f patroni_master patroni_slave haproxy
 ```
@@ -72,24 +82,25 @@ docker-compose logs -f patroni_master patroni_slave haproxy
 ## 🌐 Acceso a Servicios
 
 ### App1 - Gestor de Reservas ✅
-- **Frontend**: http://localhost:8082
-- **Health Check**: http://localhost:8082/health
-- **API**: http://localhost:8082/api
+- **Frontend**: http://localhost:8083
+- **Health Check**: http://localhost:8083/health
+- **API**: http://localhost:8083/api
+
+### App2 - Sistema de Tickets ✅
+- **Web**: http://localhost:5002
+- **Endpoints**: Ver sección API de App2
+
+### App3 - Portal de Venta ✅
+- **Frontend**: http://localhost:5003
+
+### Middleware ✅
+- **API**: http://localhost:8000
 
 ### Infraestructura
 - **HAProxy Stats (PostgreSQL)**: http://localhost:7001
 - **RabbitMQ Management**: http://localhost:15672 (guest/guest)
 - **PostgreSQL**: localhost:5432
 - **MariaDB**: localhost:3306
-
-### App2 - Facturación (Pendiente)
-- **API**: http://localhost:5002
-
-### App3 - Portal (Pendiente)
-- **Frontend**: http://localhost:5003
-
-### Middleware (Pendiente)
-- **API**: http://localhost:8000
 
 ## 📦 Componentes del Sistema
 
@@ -106,22 +117,68 @@ docker-compose logs -f patroni_master patroni_slave haproxy
   - PostgreSQL con Patroni (master/slave)
   - Failover automático
   - Health checks
-- **Puertos**: 8080 (frontend), 5432 (PostgreSQL), 7000 (HAProxy stats)
+- **Puertos**: 8083 (frontend), 5432 (PostgreSQL), 7001 (HAProxy stats)
 
-### ⏳ App2 - Motor de Facturación
-- **Tecnología**: Python (Flask) + MariaDB
-- **Funcionalidad**: Generación de tickets PDF y boletas fiscales
-- **Estado**: Por implementar
+### ✅ App2 - Motor de Facturación (Ticketera)
 
-### ⏳ App3 - Portal de Venta
+Sistema de gestión, venta y validación de entradas a eventos con integración asíncrona mediante RabbitMQ.
+
+#### Características Principales
+- **Recepción Asíncrona de Tickets**: Escucha activa de cola RabbitMQ
+- **Gestión de Usuarios Híbrida**:
+  - Registro completo con RUT, Nombre, Email y Contraseña
+  - Usuarios Placeholder automáticos (solo RUT)
+  - Vinculación automática al registrarse
+- **Flujo de Compra**:
+  - Estado inicial: `PENDING_PAYMENT`
+  - Simulación de Pasarela de Pago
+  - Transición a `PAID`
+- **Uso de Tickets**: Validación y "quemado" de entradas (Check-in) → `USED`
+- **Reembolsos**: Lógica para devoluciones (solo tickets pagados y no usados)
+
+#### Estructura de Datos
+
+**Usuario (`User`)**
+| Campo | Tipo | Descripción |
+| :--- | :--- | :--- |
+| `rut` | INT (PK) | Identificador único nacional (sin DV) |
+| `full_name` | VARCHAR | Nombre completo |
+| `email` | VARCHAR | Único. Puede ser `NULL` (Placeholder) |
+| `password_hash` | VARCHAR | Hash seguro. Puede ser `NULL` (Placeholder) |
+
+**Ticket (`Ticket`)**
+| Campo | Tipo | Descripción |
+| :--- | :--- | :--- |
+| `id` | INT (PK) | ID interno |
+| `external_id` | VARCHAR | ID proveniente del Middleware |
+| `status` | ENUM | `PENDING_PAYMENT`, `PAID`, `USED`, `REFUNDED` |
+| `user_rut` | INT (FK) | Referencia al dueño del ticket |
+
+#### Integración Middleware
+
+El sistema consume mensajes de la cola `new_ticket` en RabbitMQ.
+
+**Formato del Mensaje (JSON)**:
+```json
+{
+  "id": "EXT-UUID-1234",    
+  "rut": 12345678,       
+  "price": 5000.00,      
+  "event": "Nombre del Evento" 
+}
+```
+
+### ✅ App3 - Portal de Venta
 - **Tecnología**: Python (Flask)
-- **Funcionalidad**: Interfaz web para usuarios finales
-- **Estado**: Por implementar
+- **Funcionalidad**: 
+  - Interfaz web para usuarios finales
+  - Visualización de eventos
+  - Selección de asientos
+  - Integración con App1 y Middleware
 
-### ⏳ Middleware - Orquestador
+### ✅ Middleware - Orquestador
 - **Tecnología**: Go + RabbitMQ
 - **Funcionalidad**: Comunicación entre App1, App2 y App3
-- **Estado**: Por implementar
 
 ## 🧪 Pruebas de Tolerancia a Fallos
 
@@ -132,7 +189,7 @@ docker-compose logs -f patroni_master patroni_slave haproxy
 docker stop app1_replica1
 
 # El sistema sigue funcionando (Nginx redirige a replica2)
-curl http://localhost:8080/health
+curl http://localhost:8083/health
 
 # Reiniciar
 docker start app1_replica1
@@ -145,10 +202,10 @@ docker start app1_replica1
 docker stop app1_patroni_master
 
 # Patroni promueve automáticamente al slave como nuevo master
-# Verificar en HAProxy stats: http://localhost:7000
+# Verificar en HAProxy stats: http://localhost:7001
 
 # El sistema continúa funcionando
-curl http://localhost:8080/api/events
+curl http://localhost:8083/api/events
 ```
 
 ### 3. Prevención de Double-Booking
@@ -156,7 +213,7 @@ curl http://localhost:8080/api/events
 ```bash
 # Ejecutar múltiples reservas simultáneas del mismo asiento
 for i in {1..10}; do
-  curl -X POST http://localhost:8080/api/reserve \
+  curl -X POST http://localhost:8083/api/reserve \
     -H "Content-Type: application/json" \
     -d '{"seat_id": 1, "user_id": '$i'}' &
 done
@@ -165,17 +222,15 @@ done
 # El resto recibe error 409 (Conflict)
 ```
 
-### 4. Caída de Nginx Load Balancer
+### 4. Prueba de Middleware con RabbitMQ
 
 ```bash
-# Detener Nginx
-docker stop app1_nginx_lb
+# Simular envío de tickets desde Middleware
+pip install pika
+python3 simulate_middleware.py
 
-# Las réplicas siguen funcionando, pero no hay balanceo
-# Acceso directo a replica1 (requiere exponer puerto)
-
-# Reiniciar
-docker start app1_nginx_lb
+# Verificar en App2 que los tickets fueron recibidos
+curl http://localhost:5002/api/tickets
 ```
 
 ## 📊 API de App1
@@ -318,10 +373,9 @@ docker exec ticketflow_rabbitmq rabbitmqctl list_connections
 - **Puerto**: 5432
 
 ### MariaDB (App2)
-- **Usuario**: user
-- **Password**: password
-- **Root Password**: ***REMOVED***
-- **Database**: ***REMOVED***
+- **Usuario**: Ver archivo `.env`
+- **Password**: Ver archivo `.env`
+- **Database**: Ver archivo `.env`
 - **Puerto**: 3306
 
 ### RabbitMQ
@@ -343,11 +397,33 @@ Proy3_SD/
 │   ├── Dockerfile             # Build de App1
 │   ├── nginx.conf             # Config Load Balancer
 │   ├── haproxy.cfg            # Config PostgreSQL LB
-│   └── README.md              # Documentación App1
-├── app2/                       # App2 - Facturación (pendiente)
-├── app3/                       # App3 - Portal (pendiente)
-├── middleware/                 # Middleware (pendiente)
+│   └── docker-compose.yml     # Compose específico App1
+├── app2/                       # App2 - Facturación (Python)
+│   ├── app/
+│   │   ├── models.py          # Modelos de Datos
+│   │   ├── services.py        # Lógica de Negocio
+│   │   ├── routes.py          # Controladores Web
+│   │   └── socket_listener.py # Consumidor RabbitMQ
+│   ├── run.py                 # Entrypoint Web
+│   ├── run_listener.py        # Entrypoint Listener
+│   └── Dockerfile
+├── app3/                       # App3 - Portal de Venta
+│   ├── app.py
+│   ├── templates/
+│   │   ├── index.html
+│   │   └── seats.html
+│   └── Dockerfile
+├── middleware/                 # Middleware - Orquestador (Go)
+│   ├── main.go
+│   ├── go.mod
+│   └── Dockerfile
+├── mariadb/                    # Configuración MariaDB
+│   ├── Dockerfile
+│   └── init.sql
+├── diagramas/                  # Diagramas del sistema
+│   └── app2/                   # Diagramas específicos App2
 ├── docker-compose.yml          # Orquestación completa
+├── .env.example                # Ejemplo de variables de entorno
 ├── README.md                   # Esta documentación
 ├── Proyecto3.pdf              # Enunciado
 └── Informe de contexto.pdf    # Contexto del proyecto
@@ -359,7 +435,7 @@ Proy3_SD/
 
 ```bash
 # Ver qué proceso usa el puerto
-lsof -i :8080
+lsof -i :8083
 
 # Matar proceso
 kill -9 <PID>
@@ -374,7 +450,7 @@ kill -9 <PID>
 docker-compose logs patroni_master patroni_slave
 
 # Ver estado de HAProxy
-open http://localhost:7000
+open http://localhost:7001
 
 # Reiniciar cluster
 docker-compose restart patroni_master patroni_slave haproxy
@@ -405,11 +481,40 @@ docker-compose build --no-cache
 docker-compose up -d
 ```
 
+### RabbitMQ no recibe mensajes
+
+```bash
+# Ver estado de colas
+docker exec ticketflow_rabbitmq rabbitmqctl list_queues
+
+# Ver logs
+docker-compose logs rabbitmq
+
+# Verificar conexiones
+docker exec ticketflow_rabbitmq rabbitmqctl list_connections
+```
+
 ## 📚 Documentación Adicional
 
 - [App1 - Documentación Completa](app1/README.md)
 - [Proyecto 3 - Enunciado](Proyecto3.pdf)
 - [Informe de Contexto](Informe%20de%20contexto.pdf)
+
+## 📊 Diagramas
+
+Los diagramas del sistema se encuentran en el directorio `diagramas/`:
+
+### App2 - Diagramas Disponibles
+- Diagrama de Casos de Uso
+- Diagrama de Clases
+- Diagrama de Base de Datos (ER)
+- Diagramas de Secuencia:
+  - Recepción de Ticket (Middleware)
+  - Registro de Usuario
+  - Login
+  - Pago de Ticket
+  - Uso de Ticket
+  - Devolución de Ticket
 
 ## 🎓 Proyecto Académico
 

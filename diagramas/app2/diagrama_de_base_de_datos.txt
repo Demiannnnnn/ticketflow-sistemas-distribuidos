@@ -1,0 +1,42 @@
+enum ticket_status {
+  PENDING_PAYMENT
+  PAID
+  USED
+  REFUNDED
+}
+
+// Tabla de Usuarios
+Table users {
+  rut integer [primary key, increment]
+  username varchar [not null]
+  email varchar [unique, not null, note: 'Usado para Login']
+  password_hash varchar [not null]
+  
+  // Metadatos opcionales pero recomendados
+  created_at timestamp [default: `now()`] 
+}
+
+// Tabla de Tickets (Entradas)
+Table tickets {
+  id integer [primary key, increment]
+  external_id varchar [unique, note: 'Identificador del Middleware']
+  price float [not null]
+  event_name varchar [not null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+  status ticket_status [default: 'PENDING_PAYMENT']
+  
+  // Clave foránea
+  user_rut integer [ref: > users.rut] // Relación: Un User tiene muchos Tickets
+}
+
+// Tabla de Pagos
+Table payments {
+  id integer [primary key, increment]
+  amount float [not null]
+  paid_at timestamp [default: `now()`]
+  payment_method varchar [not null]
+  
+  // Clave foránea
+  ticket_id integer [unique, ref: - tickets.id] // Relación 1 a 1: Un Ticket genera un (o cero) Pagos
+}

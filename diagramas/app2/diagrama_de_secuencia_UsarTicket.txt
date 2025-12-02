@@ -1,0 +1,38 @@
+@startuml
+autonumber
+title Secuencia: Uso de Ticket (Check-in)
+
+actor "Cliente" as User
+participant "TicketController" as Controller
+participant "TicketService" as Service
+participant "Ticket (Model)" as TicketModel
+database "Base de Datos" as DB
+
+User -> Controller: POST /use-ticket/<id> 
+activate Controller
+
+    Controller -> Service: use_ticket(user, ticket_id) [cite: 4]
+    activate Service
+    
+        Service -> DB: Obtener Ticket
+        activate DB
+        DB --> Service: Objeto Ticket
+        deactivate DB
+        
+        Service -> Service: Validar status == PAID 
+        note right: Regla de negocio compleja 
+        
+        alt Ticket Válido
+            Service -> TicketModel: set status = USED 
+            Service -> DB: Commit cambios
+            Service --> Controller: True (Acceso concedido)
+        else Ticket No Válido / No Pagado
+            Service --> Controller: False (Acceso denegado)
+        end
+        
+    deactivate Service
+
+    Controller --> User: Mensaje de confirmación
+
+deactivate Controller
+@enduml

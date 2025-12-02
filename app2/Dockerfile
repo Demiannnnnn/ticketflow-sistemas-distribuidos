@@ -20,12 +20,5 @@ EXPOSE 5002
 ENV FLASK_APP=run.py
 ENV FLASK_RUN_HOST=0.0.0.0
 
-# Run the command to start the Flask application
-# We will have two processes: the Flask app and the RabbitMQ consumer.
-# A better approach in production would be to use a process manager like supervisord,
-# or run them in separate containers. For simplicity here, we'll start the web server.
-# The consumer can be started manually or with another script.
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5002"]
-
-# To run the consumer, you could use a command like:
-# CMD ["python", "-m", "app.consumer"]
+# Run the command to start the application
+CMD ["./start.sh"]

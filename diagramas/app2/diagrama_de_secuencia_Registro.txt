@@ -1,0 +1,53 @@
+@startuml
+autonumber
+title Secuencia: Registro de Usuario
+
+actor "Cliente" as UserActor
+participant "AuthController" as Controller
+participant "AuthService" as Service
+participant "User (Model)" as UserModel
+database "Base de Datos" as DB
+
+UserActor -> Controller: POST /register (email, username, password)
+activate Controller
+
+    Controller -> Service: register(email, username, password)
+    activate Service
+    
+        Service -> DB: Buscar si existe usuario (email)
+        activate DB
+        DB --> Service: Null (No existe)
+        deactivate DB
+        
+        alt Usuario Nuevo (Email disponible)
+            create UserModel
+            Service -> UserModel: Crear instancia
+            
+            note right of Service
+              Es crítico encriptar la password
+              antes de guardar
+            end note
+            
+            Service -> UserModel: set_password(password)
+            activate UserModel
+            UserModel -> UserModel: Generar Hash
+            UserModel --> Service: OK
+            deactivate UserModel
+            
+            Service -> DB: Guardar (Commit)
+            activate DB
+            DB --> Service: Confirmación ID
+            deactivate DB
+            
+            Service --> Controller: Retorna Nuevo User
+            Controller --> UserActor: 201 Created (Usuario creado)
+            
+        else El Usuario ya existe
+            Service --> Controller: Error (Email duplicado)
+            Controller --> UserActor: 400 Bad Request (El usuario ya existe)
+        end
+        
+    deactivate Service
+
+deactivate Controller
+@enduml

@@ -44,7 +44,7 @@ services:
       - ticketflow_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -67,30 +67,10 @@ services:
       - ticketflow_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
       interval: 10s
       timeout: 5s
       retries: 3
-
-  # ========================================
-  # ETCD - Coordinación de Patroni (COMENTADO - No necesario sin Patroni completo)
-  # Para implementación completa con Patroni, descomentar esto
-  # ========================================
-  # etcd:
-  #   image: quay.io/coreos/etcd:v3.5.9
-  #   container_name: app1_etcd
-  #   environment:
-  #     - ETCD_NAME=etcd
-  #     - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd:2380
-  #     - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
-  #     - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
-  #     - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
-  #     - ETCD_INITIAL_CLUSTER=etcd=http://etcd:2380
-  #     - ETCD_INITIAL_CLUSTER_STATE=new
-  #     - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster
-  #   networks:
-  #     - ticketflow_network
-  #   restart: unless-stopped
 
   # ========================================
   # PATRONI - POSTGRESQL MASTER
@@ -108,7 +88,7 @@ services:
       - ticketflow_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -129,7 +109,7 @@ services:
       - ticketflow_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -142,7 +122,7 @@ services:
     container_name: app1_haproxy
     ports:
       - "5432:5432"
-      - "7001:7000"  # Stats
+      - "7001:7000" # Stats
     volumes:
       - ./app1/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     networks:
@@ -159,7 +139,7 @@ services:
     image: rabbitmq:3-management
     container_name: ticketflow_rabbitmq
     ports:
-      - "5672:5672"   # AMQP
+      - "5672:5672" # AMQP
       - "15672:15672" # Management UI (guest/guest)
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
@@ -171,13 +151,13 @@ services:
   # MARIADB - Para App2 (Facturación)
   # ========================================
   mariadb:
-    image: mariadb:10.5
+    build: ./mariadb
     container_name: ticketflow_mariadb
     environment:
-      - MYSQL_ROOT_PASSWORD=***REMOVED***
-      - MYSQL_DATABASE=***REMOVED***
-      - MYSQL_USER=user
-      - MYSQL_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${APP2_DB_NAME}
+      - MYSQL_USER=${APP2_DB_USER}
+      - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
@@ -188,25 +168,22 @@ services:
 
   # ========================================
   # APP2 - Motor de Facturación (Python)
-  # ESTADO: Por implementar
-  # Descomentar cuando ./app2 esté listo
   # ========================================
-  # app2:
-  #   build: ./app2
-  #   container_name: ticketflow_app2
-  #   ports:
-  #     - "5002:5002"
-  #   environment:
-  #     - DATABASE_URL=mysql+mysqlconnector://user:password@mariadb/***REMOVED***
-  #     - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-  #   volumes:
-  #     - ./app2:/usr/src/app
-  #   depends_on:
-  #     - mariadb
-  #     - rabbitmq
-  #   networks:
-  #     - ticketflow_network
-  #   restart: unless-stopped
+  app2:
+    build: ./app2
+    container_name: ticketflow_app2
+    ports:
+      - "${APP2_RUN_PORT}:5002"
+    env_file:
+      - .env
+    volumes:
+      - ./app2:/usr/src/app
+    depends_on:
+      - mariadb
+      - rabbitmq
+    networks:
+      - ticketflow_network
+    restart: unless-stopped
 
   # ========================================
   # APP3 - Portal de Venta (Python)

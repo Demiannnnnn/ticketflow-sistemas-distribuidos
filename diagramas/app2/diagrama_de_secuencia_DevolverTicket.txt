@@ -1,0 +1,48 @@
+@startuml
+autonumber
+title Secuencia: Devolución de Ticket
+
+actor "Cliente" as User
+participant "TicketController" as Controller
+participant "TicketService" as Service
+participant "PaymentGateway" as Gateway
+participant "Ticket (Model)" as TicketModel
+database "Base de Datos" as DB
+
+User -> Controller: POST /refund-ticket/<id> 
+activate Controller
+
+    Controller -> Service: refund_ticket(user, ticket_id) [cite: 4]
+    activate Service
+    
+        Service -> DB: Consultar Ticket
+        activate DB
+        DB --> Service: Datos del Ticket
+        deactivate DB
+        
+        Service -> Service: Validar fechas para devolución 
+        Service -> Service: Validar status == PAID
+        
+        alt Validaciones OK
+            Service -> Gateway: refund_transaction(transaction_id) [cite: 4]
+            activate Gateway
+            Gateway --> Service: bool (Reembolso OK)
+            deactivate Gateway
+            
+            alt Reembolso Gateway Exitoso
+                Service -> TicketModel: set status = REFUNDED 
+                Service -> DB: Guardar cambios
+                Service --> Controller: True (Devuelto)
+            else Fallo en Gateway
+                Service --> Controller: False (Error bancario)
+            end
+        else Validaciones Fallidas
+            Service --> Controller: False (No cumple políticas)
+        end
+        
+    deactivate Service
+
+    Controller --> User: Respuesta (Reembolso procesado o denegado)
+
+deactivate Controller
+@enduml
