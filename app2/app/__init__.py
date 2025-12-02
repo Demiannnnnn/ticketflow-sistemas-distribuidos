@@ -15,13 +15,17 @@ def create_app(config_class=Config):
     with app.app_context():
         # Retry logic for DB connection
         import time
-        from sqlalchemy.exc import OperationalError
+        from sqlalchemy.exc import OperationalError, ProgrammingError
         
         retries = 10
         while retries > 0:
             try:
                 db.create_all()
                 print("Database connection successful and tables created.")
+                break
+            except ProgrammingError as e:
+                # Tables already exist, this is fine
+                print("Database tables already exist, continuing...")
                 break
             except OperationalError as e:
                 retries -= 1
