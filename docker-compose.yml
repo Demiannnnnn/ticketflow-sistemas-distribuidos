@@ -7,7 +7,32 @@ version: '3.8'
 
 services:
   # ========================================
-  # APP1 - LOAD BALANCER (NGINX)
+  # INFRAESTRUCTURA COMÚN
+  # ========================================
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: ticketflow_etcd
+    environment:
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+    ports:
+      - "2379:2379"
+    networks:
+      - ticketflow_network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ticketflow_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - ticketflow_network
+
+  # ========================================
+  # APP1 - GESTOR DE RESERVAS (Go + Patroni)
   # ========================================
   nginx:
     image: nginx:alpine
@@ -21,11 +46,7 @@ services:
       - app1_replica2
     networks:
       - ticketflow_network
-    restart: unless-stopped
 
-  # ========================================
-  # APP1 - RÉPLICAS (Go + PostgreSQL)
-  # ========================================
   app1_replica1:
     build:
       context: ./app1
@@ -42,7 +63,6 @@ services:
       - haproxy
     networks:
       - ticketflow_network
-    restart: unless-stopped
     healthcheck:
       test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
       interval: 10s
@@ -65,63 +85,47 @@ services:
       - haproxy
     networks:
       - ticketflow_network
-    restart: unless-stopped
     healthcheck:
       test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
       interval: 10s
       timeout: 5s
       retries: 3
 
-  # ========================================
-  # PATRONI - POSTGRESQL MASTER
-  # ========================================
+  # --- Patroni Cluster ---
   patroni_master:
-    image: postgres:15-alpine
+    build: ./app1/db
     container_name: app1_patroni_master
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=***REMOVED***
-      - POSTGRES_DB=ticketflow
+      - PATRONI_NAME=patroni_master
+      - PATRONI_ETCD_HOST=etcd:2379
     volumes:
-      - patroni_master_data:/var/lib/postgresql/data
+      - patroni_master_data:/var/lib/postgresql/data/patroni
     networks:
       - ticketflow_network
-    restart: unless-stopped
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    depends_on:
+      - etcd
 
-  # ========================================
-  # POSTGRESQL REPLICA (Simulated Slave)
-  # ========================================
   patroni_slave:
-    image: postgres:15-alpine
+    build: ./app1/db
     container_name: app1_patroni_slave
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=***REMOVED***
-      - POSTGRES_DB=ticketflow
+      - PATRONI_NAME=patroni_slave
+      - PATRONI_ETCD_HOST=etcd:2379
     volumes:
-      - patroni_slave_data:/var/lib/postgresql/data
+      - patroni_slave_data:/var/lib/postgresql/data/patroni
     networks:
       - ticketflow_network
-    restart: unless-stopped
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    depends_on:
+      - etcd
+      - patroni_master
 
-  # ========================================
-  # HAPROXY - Load Balancer PostgreSQL
-  # ========================================
   haproxy:
     image: haproxy:2.8-alpine
     container_name: app1_haproxy
     ports:
-      - "5432:5432"
+      - "5432:5432" # Postgres Master
+      - "5433:5433" # Postgres Replica
+      - "3307:3306" # MariaDB Proxy (Mapped to 3307 on host to avoid conflict if local mysql running)
       - "7001:7000" # Stats
     volumes:
       - ./app1/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
@@ -130,45 +134,56 @@ services:
     depends_on:
       - patroni_master
       - patroni_slave
-    restart: unless-stopped
+      - mariadb_master
 
   # ========================================
-  # RABBITMQ - Message Broker
+  # APP2 - FACTURACIÓN (Python + MariaDB HA)
   # ========================================
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: ticketflow_rabbitmq
-    ports:
-      - "5672:5672" # AMQP
-      - "15672:15672" # Management UI (guest/guest)
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-      - ticketflow_network
-    restart: unless-stopped
-
-  # ========================================
-  # MARIADB - Para App2 (Facturación)
-  # ========================================
-  mariadb:
-    build: ./mariadb
-    container_name: ticketflow_mariadb
+  mariadb_master:
+    build: ./app2/database
+    container_name: mariadb_master
     environment:
       - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
       - MYSQL_DATABASE=${APP2_DB_NAME}
       - MYSQL_USER=${APP2_DB_USER}
       - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
-    ports:
-      - "3306:3306"
+      - MARIADB_ROLE=master
+    command: --log-bin=mariadb-bin --server-id=1
     volumes:
-      - mariadb_data:/var/lib/mysql
+      - mariadb_master_data:/var/lib/mysql
     networks:
       - ticketflow_network
-    restart: unless-stopped
 
-  # ========================================
-  # APP2 - Motor de Facturación (Python)
-  # ========================================
+  mariadb_slave:
+    build: ./app2/database
+    container_name: mariadb_slave
+    environment:
+      - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${APP2_DB_NAME}
+      - MYSQL_USER=${APP2_DB_USER}
+      - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
+      - MARIADB_ROLE=slave
+    command: --server-id=2
+    volumes:
+      - ./app2/database/replication_entrypoint.sh:/replication_entrypoint.sh
+      - mariadb_slave_data:/var/lib/mysql
+    entrypoint: [ "/bin/bash", "/replication_entrypoint.sh" ]
+    depends_on:
+      - mariadb_master
+    networks:
+      - ticketflow_network
+
+  orchestrator:
+    image: openark/orchestrator
+    container_name: ticketflow_orchestrator
+    ports:
+      - "3000:3000"
+    networks:
+      - ticketflow_network
+    depends_on:
+      - mariadb_master
+      - mariadb_slave
+
   app2:
     build: ./app2
     container_name: ticketflow_app2
@@ -176,17 +191,19 @@ services:
       - "${APP2_RUN_PORT}:5002"
     env_file:
       - .env
+    environment:
+      - APP2_DB_HOST=haproxy # Connect via HAProxy
+      - APP2_DB_PORT=3306
     volumes:
       - ./app2:/usr/src/app
     depends_on:
-      - mariadb
+      - haproxy
       - rabbitmq
     networks:
       - ticketflow_network
-    restart: unless-stopped
 
   # ========================================
-  # APP3 - Portal de Venta (Python)
+  # APP3 & MIDDLEWARE
   # ========================================
   app3:
     build: ./app3
@@ -199,11 +216,7 @@ services:
       - rabbitmq
     networks:
       - ticketflow_network
-    restart: unless-stopped
 
-  # ========================================
-  # MIDDLEWARE - Orquestador (Go + RabbitMQ)
-  # ========================================
   middleware:
     build: ./middleware
     container_name: ticketflow_middleware
@@ -215,7 +228,6 @@ services:
       - rabbitmq
     networks:
       - ticketflow_network
-    restart: unless-stopped
 
 networks:
   ticketflow_network:
@@ -224,5 +236,6 @@ networks:
 volumes:
   patroni_master_data:
   patroni_slave_data:
-  mariadb_data:
+  mariadb_master_data:
+  mariadb_slave_data:
   rabbitmq_data:

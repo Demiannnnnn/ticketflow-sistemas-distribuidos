@@ -36,3 +36,8 @@ CREATE TABLE IF NOT EXISTS payments (
     ticket_id INT UNIQUE NOT NULL, -- Relación 1 a 1
     FOREIGN KEY (ticket_id) REFERENCES tickets(id)
 );
+
+-- Usuario de replicación
+CREATE USER IF NOT EXISTS 'replicator'@'%' IDENTIFIED ***REMOVED***';
+GRANT REPLICATION SLAVE ON *.* TO 'replicator'@'%';
+FLUSH PRIVILEGES;
