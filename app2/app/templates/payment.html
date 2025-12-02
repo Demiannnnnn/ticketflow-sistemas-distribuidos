@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card mt-5">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-credit-card"></i> Secure Payment Gateway</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <strong>Simulación:</strong> Puedes ingresar cualquier dato. El pago será exitoso.
+                </div>
+                
+                <p>Estás pagando por: <strong>{{ ticket.event_name }}</strong></p>
+                <h3 class="text-center mb-4">${{ ticket.price }}</h3>
+
+                <form action="{{ url_for('ticket.pay_ticket', ticket_id=ticket.id) }}" method="POST">
+                    <div class="mb-3">
+                        <label for="cardName" class="form-label">Nombre en la Tarjeta</label>
+                        <input type="text" class="form-control" id="cardName" placeholder="Juan Pérez" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="cardNumber" class="form-label">Número de Tarjeta</label>
+                        <input type="text" class="form-control" id="cardNumber" placeholder="0000 0000 0000 0000" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="expiry" class="form-label">Expiración (MM/YY)</label>
+                            <input type="text" class="form-control" id="expiry" placeholder="12/25" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="cvv" class="form-label">CVV</label>
+                            <input type="text" class="form-control" id="cvv" placeholder="123" required>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success btn-lg">Pagar Ahora</button>
+                        <a href="{{ url_for('ticket.my_tickets') }}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

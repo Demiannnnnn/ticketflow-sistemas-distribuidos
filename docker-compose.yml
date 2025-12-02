@@ -15,7 +15,8 @@ services:
     volumes:
       - ./app2:/usr/src/app
     depends_on:
-      - mariadb
+      mariadb:
+        condition: service_healthy
 
   nginx:
     image: nginx:latest
@@ -34,6 +35,11 @@ services:
       - MYSQL_DATABASE=${APP2_DB_NAME}
       - MYSQL_USER=${APP2_DB_USER}
       - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "3306:3306"
     volumes:
