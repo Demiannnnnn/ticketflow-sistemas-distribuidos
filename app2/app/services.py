@@ -1,5 +1,6 @@
 from datetime import datetime
 from .models import db, User, Ticket, Payment, TicketStatus
+from .notification_client import NotificationClient
 
 class PaymentGateway:
     @staticmethod
@@ -105,6 +106,14 @@ class TicketService:
             )
             db.session.add(payment)
             db.session.commit()
+            
+            # Notify Middleware
+            NotificationClient.send_event("TICKET_PAID", {
+                "external_id": ticket.external_id,
+                "price": ticket.price,
+                "user_rut": ticket.user_rut
+            })
+            
             return True
         return False
 
@@ -131,9 +140,20 @@ class TicketService:
             if PaymentGateway.refund_transaction(ticket.payment.id):
                 ticket.status = TicketStatus.REFUNDED
                 db.session.commit()
+                
+                # Notify Middleware
+                NotificationClient.send_event("TICKET_REFUNDED", {
+                    "external_id": ticket.external_id,
+                    "user_rut": ticket.user_rut
+                })
+                
                 return True
         return False
 
     @staticmethod
     def get_user_tickets(user_rut):
         return Ticket.query.filter_by(user_rut=user_rut).all()
+
+    @staticmethod
+    def get_ticket(user_rut, ticket_id):
+        return Ticket.query.filter_by(id=ticket_id, user_rut=user_rut).first()

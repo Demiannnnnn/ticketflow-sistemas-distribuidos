@@ -33,8 +33,19 @@ class TestSequenceCompliance(unittest.TestCase):
     def test_full_user_flow(self):
         print("\n--- Testing Placeholder User and Registration Sequence ---")
         
-        # 1. Receive Ticket for UNKNOWN RUT (Should create placeholder)
         target_rut = 12345678
+        
+        # Clean up specific user and their tickets to ensure fresh state
+        existing_user = User.query.get(target_rut)
+        if existing_user:
+            print(f"Found existing user {target_rut}. Cleaning up...")
+            # Delete associated tickets first due to Foreign Key constraint
+            Ticket.query.filter_by(user_rut=target_rut).delete()
+            db.session.delete(existing_user)
+            db.session.commit()
+            print(f"Cleaned up existing user {target_rut} and tickets.")
+        
+        # 1. Receive Ticket for UNKNOWN RUT (Should create placeholder)
         ticket_data = {
             "id": "EXT999",
             "price": 150.0,

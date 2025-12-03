@@ -83,6 +83,32 @@ def my_tickets():
     # but simpler to just pass the ticket objects.
     return render_template('my_tickets.html', tickets=tickets)
 
+@ticket_bp.route('/payment/<int:ticket_id>', methods=['GET'])
+def payment_page(ticket_id):
+    if g.user_rut is None:
+        flash('Please login first', 'warning')
+        return redirect(url_for('auth.login'))
+    
+    ticket = TicketService.get_ticket(g.user_rut, ticket_id)
+    if not ticket:
+        flash('Ticket not found', 'danger')
+        return redirect(url_for('ticket.my_tickets'))
+        
+    return render_template('payment.html', ticket=ticket)
+
+@ticket_bp.route('/view-qr/<int:ticket_id>', methods=['GET'])
+def view_qr(ticket_id):
+    if g.user_rut is None:
+        flash('Please login first', 'warning')
+        return redirect(url_for('auth.login'))
+    
+    ticket = TicketService.get_ticket(g.user_rut, ticket_id)
+    if not ticket:
+        flash('Ticket not found', 'danger')
+        return redirect(url_for('ticket.my_tickets'))
+        
+    return render_template('ticket_qr.html', ticket=ticket)
+
 @ticket_bp.route('/pay-ticket/<int:ticket_id>', methods=['POST'])
 def pay_ticket(ticket_id):
     if g.user_rut is None:

@@ -36,15 +36,12 @@
                 <td>
                     <div class="btn-group" role="group">
                         {% if ticket.status.value == 'PENDING_PAYMENT' %}
-                        <form action="{{ url_for('ticket.pay_ticket', ticket_id=ticket.id) }}" method="POST" style="display:inline;">
-                            <button type="submit" class="btn btn-sm btn-primary">Pay</button>
-                        </form>
+                        <a href="{{ url_for('ticket.payment_page', ticket_id=ticket.id) }}" class="btn btn-sm btn-primary">Pay</a>
                         {% endif %}
 
                         {% if ticket.status.value == 'PAID' %}
-                        <form action="{{ url_for('ticket.use_ticket', ticket_id=ticket.id) }}" method="POST" style="display:inline;">
-                            <button type="submit" class="btn btn-sm btn-info text-white">Use</button>
-                        </form>
+                        <a href="{{ url_for('ticket.view_qr', ticket_id=ticket.id) }}" class="btn btn-sm btn-info text-white">Use/QR</a>
+                        
                         <form action="{{ url_for('ticket.refund_ticket', ticket_id=ticket.id) }}" method="POST" style="display:inline; margin-left: 5px;">
                             <button type="submit" class="btn btn-sm btn-danger">Refund</button>
                         </form>

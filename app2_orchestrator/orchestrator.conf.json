@@ -1,0 +1,22 @@
+{
+  "Debug": true,
+  "EnableSyslog": false,
+  "ListenAddress": ":3000",
+  "MySQLTopologyUser": "orch_user",
+  "MySQLTopologyPassword": "orch_password",
+  "BackendDB": "sqlite",
+  "SQLite3DataFile": "/var/lib/orchestrator/orchestrator.sqlite3",
+  "RecoveryPeriodBlockSeconds": 5,
+  "RecoverMasterClusterFilters": [
+    "*"
+  ],
+  "RecoverIntermediateMasterClusterFilters": [
+    "*"
+  ],
+  "ApplyMySQLPromotionAfterMasterFailover": true,
+  "PreventCrossDataCenterMasterFailover": false,
+  "FailMasterPromotionIfSQLThreadNotUpToDate": true,
+  "PostFailoverProcesses": [
+    "/scripts/proxy-failover.sh {failureType} {failureDescription} {failedHost} {successorHost}"
+  ]
+}

@@ -34,9 +34,14 @@ def test_api_flow():
 
     # 2. Register
     log("Testing Registration...")
+    # Use a random RUT to avoid "User already exists" in repeated runs without cleanup
+    # or just stick to a fixed one if we handle the error. 
+    # Routes expect: email, rut, full_name, password
+    target_rut = 99998888
     payload = {
         "email": EMAIL,
-        "username": USERNAME,
+        "rut": target_rut,
+        "full_name": "API Test User",
         "password": PASSWORD
     }
     resp = session.post(f"{BASE_URL}/register", data=payload)
@@ -45,10 +50,14 @@ def test_api_flow():
     if resp.status_code == 200 and "login" in resp.url:
         log("Registration successful (Redirected to login).")
     elif resp.status_code == 200 and "User already exists" in resp.text:
-        log("User already exists (expected if re-running).")
+        log("User already exists (expected if re-running). Proceeding to login.")
     else:
-        log(f"Registration failed: {resp.status_code}")
-        # print(resp.text)
+        # If we are strictly testing flow, failing registration might be critical, 
+        # but for connectivity check, let's see if we can proceed or fail verbosely.
+        log(f"Registration failed response. URL: {resp.url}. Text snippet: {resp.text[:100]}...") 
+        # Don't exit yet, try login anyway just in case
+        
+    time.sleep(1)
 
     # 3. Login
     log("Testing Login...")

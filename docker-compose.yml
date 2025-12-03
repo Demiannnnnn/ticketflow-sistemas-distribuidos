@@ -1,11 +1,157 @@
 version: '3.8'
 
-# ============================================================================
-# TicketFlow - Sistema Distribuido de Venta de Tickets
-# Universidad de Talca - Proyecto 3
-# ============================================================================
-
 services:
+  # --- Capa de Aplicación ---
+  app2:
+    build: ./app2
+    deploy:
+      replicas: 2
+    env_file:
+      - .env
+    environment:
+      - MIDDLEWARE_TYPE=tcp_server
+      - APP2_DB_HOST=app2_proxysql
+      - APP2_DB_PORT=6033
+      - MIDDLEWARE_NOTIFY_HOST=172.18.0.1
+    volumes:
+      - ./app2:/usr/src/app
+    depends_on:
+      app2_proxysql:
+        condition: service_healthy
+    networks:
+      - app2_network
+
+  app2_nginx:
+    image: nginx:1.25.4
+    volumes:
+      - ./app2_nginx_lb/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "${APP2_RUN_PORT}:80"
+      - "${APP2_SOCKET_PORT:-6002}:6002"
+    depends_on:
+      - app2
+    networks:
+      - app2_network
+
+  # --- Capa de Enrutamiento y HA ---
+  app2_proxysql:
+    image: proxysql/proxysql:2.5.4
+    volumes:
+      - ./app2_proxysql/conf/proxysql.cnf:/etc/proxysql.cnf
+    ports:
+      - "6032:6032"
+      - "6033:6033"
+    healthcheck:
+      test: ["CMD", "mysql", "-h127.0.0.1", "-P6032", "-uadmin", "-padmin", "-e", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      - app2_db1
+      - app2_db2
+      - app2_db3
+    networks:
+      - app2_network
+
+  app2_orchestrator:
+    build: ./app2_orchestrator
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./app2_orchestrator/orchestrator.conf.json:/etc/orchestrator.conf.json
+      - ./app2_orchestrator/scripts/:/scripts/
+      - app2_orchestrator_data:/var/lib/orchestrator
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      - app2_db1
+    networks:
+      - app2_network
+      
+  app2_replication_setup:
+    build: ./app2_orchestrator
+    environment:
+      - ORCHESTRATOR_API=http://app2_orchestrator:3000/api
+    volumes:
+      - ./app2_scripts/setup_replication.sh:/setup_replication.sh
+    command: ["/bin/sh", "-c", "chmod +x /setup_replication.sh && /setup_replication.sh"]
+    depends_on:
+      app2_orchestrator:
+        condition: service_healthy
+      app2_db1:
+        condition: service_healthy
+      app2_db2:
+        condition: service_healthy
+      app2_db3:
+        condition: service_healthy
+    networks:
+      - app2_network
+
+  # --- Capa de Datos (Cluster Master-Slave) ---
+  app2_db1:
+    image: mariadb:10.5.25
+    command: --server-id=1 --report-host=app2_db1
+    environment:
+      - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${APP2_DB_NAME}
+      - MYSQL_USER=${APP2_DB_USER}
+      - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
+    volumes:
+      - ./app2_mariadb/conf/my.cnf:/etc/mysql/my.cnf
+      - ./app2_mariadb/init_cluster.sql:/docker-entrypoint-initdb.d/init_cluster.sql
+      - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
+      - app2_db1_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}"]
+      interval: 5s
+      retries: 5
+    networks:
+      - app2_network
+
+  app2_db2:
+    image: mariadb:10.5.25
+    command: --server-id=2 --report-host=app2_db2
+    environment:
+      - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${APP2_DB_NAME}
+      - MYSQL_USER=${APP2_DB_USER}
+      - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
+    volumes:
+      - ./app2_mariadb/conf/my.cnf:/etc/mysql/my.cnf
+      - ./app2_mariadb/init_cluster.sql:/docker-entrypoint-initdb.d/init_cluster.sql
+      - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
+      - app2_db2_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}"]
+      interval: 5s
+      retries: 5
+    networks:
+      - app2_network
+
+  app2_db3:
+    image: mariadb:10.5.25
+    command: --server-id=3 --report-host=app2_db3
+    environment:
+      - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${APP2_DB_NAME}
+      - MYSQL_USER=${APP2_DB_USER}
+      - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
+    volumes:
+      - ./app2_mariadb/conf/my.cnf:/etc/mysql/my.cnf
+      - ./app2_mariadb/init_cluster.sql:/docker-entrypoint-initdb.d/init_cluster.sql
+      - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
+      - app2_db3_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}"]
+      interval: 5s
+      retries: 5
+    networks:
+      - app2_network
+
   # ========================================
   # INFRAESTRUCTURA COMÚN
   # ========================================
@@ -134,73 +280,7 @@ services:
     depends_on:
       - patroni_master
       - patroni_slave
-      - mariadb_master
-
-  # ========================================
-  # APP2 - FACTURACIÓN (Python + MariaDB HA)
-  # ========================================
-  mariadb_master:
-    build: ./app2/database
-    container_name: mariadb_master
-    environment:
-      - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${APP2_DB_NAME}
-      - MYSQL_USER=${APP2_DB_USER}
-      - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
-      - MARIADB_ROLE=master
-    command: --log-bin=mariadb-bin --server-id=1
-    volumes:
-      - mariadb_master_data:/var/lib/mysql
-    networks:
-      - ticketflow_network
-
-  mariadb_slave:
-    build: ./app2/database
-    container_name: mariadb_slave
-    environment:
-      - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${APP2_DB_NAME}
-      - MYSQL_USER=${APP2_DB_USER}
-      - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
-      - MARIADB_ROLE=slave
-    command: --server-id=2
-    volumes:
-      - ./app2/database/replication_entrypoint.sh:/replication_entrypoint.sh
-      - mariadb_slave_data:/var/lib/mysql
-    entrypoint: [ "/bin/bash", "/replication_entrypoint.sh" ]
-    depends_on:
-      - mariadb_master
-    networks:
-      - ticketflow_network
-
-  orchestrator:
-    image: openark/orchestrator
-    container_name: ticketflow_orchestrator
-    ports:
-      - "3000:3000"
-    networks:
-      - ticketflow_network
-    depends_on:
-      - mariadb_master
-      - mariadb_slave
-
-  app2:
-    build: ./app2
-    container_name: ticketflow_app2
-    ports:
-      - "${APP2_RUN_PORT}:5002"
-    env_file:
-      - .env
-    environment:
-      - APP2_DB_HOST=haproxy # Connect via HAProxy
-      - APP2_DB_PORT=3306
-    volumes:
-      - ./app2:/usr/src/app
-    depends_on:
-      - haproxy
-      - rabbitmq
-    networks:
-      - ticketflow_network
+      # I removed the dependency on mariadb_master here because it will be managed by app2_proxysql
 
   # ========================================
   # APP3 & MIDDLEWARE
@@ -229,13 +309,21 @@ services:
     networks:
       - ticketflow_network
 
-networks:
-  ticketflow_network:
-    driver: bridge
-
 volumes:
+  app2_db1_data:
+  app2_db2_data:
+  app2_db3_data:
+  app2_orchestrator_data:
   patroni_master_data:
   patroni_slave_data:
-  mariadb_master_data:
-  mariadb_slave_data:
   rabbitmq_data:
+
+networks:
+  app2_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+          gateway: 172.18.0.1
+  ticketflow_network:
+    driver: bridge
