@@ -24,7 +24,7 @@ services:
   app2_nginx:
     image: nginx:1.25.4
     volumes:
-      - ./nginx_lb/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./app2_nginx_lb/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "${APP2_RUN_PORT}:80"
       - "${APP2_SOCKET_PORT:-6002}:6002"
@@ -54,7 +54,6 @@ services:
       - app2_network
 
   app2_orchestrator:
-    # Usar build context renombrado
     build: ./app2_orchestrator
     ports:
       - "3000:3000"
@@ -153,11 +152,171 @@ services:
     networks:
       - app2_network
 
+  # ========================================
+  # INFRAESTRUCTURA COMÚN
+  # ========================================
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: ticketflow_etcd
+    environment:
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+    ports:
+      - "2379:2379"
+    networks:
+      - ticketflow_network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ticketflow_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - ticketflow_network
+
+  # ========================================
+  # APP1 - GESTOR DE RESERVAS (Go + Patroni)
+  # ========================================
+  nginx:
+    image: nginx:alpine
+    container_name: app1_nginx_lb
+    ports:
+      - "8083:80"
+    volumes:
+      - ./app1/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app1_replica1
+      - app1_replica2
+    networks:
+      - ticketflow_network
+
+  app1_replica1:
+    build:
+      context: ./app1
+      dockerfile: Dockerfile
+    container_name: app1_replica1
+    environment:
+      - INSTANCE_NAME=app1_replica1
+      - PORT=8080
+      - DB_HOST=haproxy
+      - DB_USER=postgres
+      - DB_PASSWORD=***REMOVED***
+      - DB_NAME=ticketflow
+    depends_on:
+      - haproxy
+    networks:
+      - ticketflow_network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  app1_replica2:
+    build:
+      context: ./app1
+      dockerfile: Dockerfile
+    container_name: app1_replica2
+    environment:
+      - INSTANCE_NAME=app1_replica2
+      - PORT=8080
+      - DB_HOST=haproxy
+      - DB_USER=postgres
+      - DB_PASSWORD=***REMOVED***
+      - DB_NAME=ticketflow
+    depends_on:
+      - haproxy
+    networks:
+      - ticketflow_network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # --- Patroni Cluster ---
+  patroni_master:
+    build: ./app1/db
+    container_name: app1_patroni_master
+    environment:
+      - PATRONI_NAME=patroni_master
+      - PATRONI_ETCD_HOST=etcd:2379
+    volumes:
+      - patroni_master_data:/var/lib/postgresql/data/patroni
+    networks:
+      - ticketflow_network
+    depends_on:
+      - etcd
+
+  patroni_slave:
+    build: ./app1/db
+    container_name: app1_patroni_slave
+    environment:
+      - PATRONI_NAME=patroni_slave
+      - PATRONI_ETCD_HOST=etcd:2379
+    volumes:
+      - patroni_slave_data:/var/lib/postgresql/data/patroni
+    networks:
+      - ticketflow_network
+    depends_on:
+      - etcd
+      - patroni_master
+
+  haproxy:
+    image: haproxy:2.8-alpine
+    container_name: app1_haproxy
+    ports:
+      - "5432:5432" # Postgres Master
+      - "5433:5433" # Postgres Replica
+      - "3307:3306" # MariaDB Proxy (Mapped to 3307 on host to avoid conflict if local mysql running)
+      - "7001:7000" # Stats
+    volumes:
+      - ./app1/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      - ticketflow_network
+    depends_on:
+      - patroni_master
+      - patroni_slave
+      # I removed the dependency on mariadb_master here because it will be managed by app2_proxysql
+
+  # ========================================
+  # APP3 & MIDDLEWARE
+  # ========================================
+  app3:
+    build: ./app3
+    container_name: ticketflow_app3
+    ports:
+      - "5003:5000"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - rabbitmq
+    networks:
+      - ticketflow_network
+
+  middleware:
+    build: ./middleware
+    container_name: ticketflow_middleware
+    ports:
+      - "8000:8000"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - rabbitmq
+    networks:
+      - ticketflow_network
+
 volumes:
   app2_db1_data:
   app2_db2_data:
   app2_db3_data:
   app2_orchestrator_data:
+  patroni_master_data:
+  patroni_slave_data:
+  rabbitmq_data:
 
 networks:
   app2_network:
@@ -166,3 +325,5 @@ networks:
       config:
         - subnet: 172.18.0.0/16
           gateway: 172.18.0.1
+  ticketflow_network:
+    driver: bridge
