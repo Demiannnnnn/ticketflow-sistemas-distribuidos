@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # --- Capa de Aplicación ---
   app2:
     build: ./app2
     deploy:
@@ -9,17 +10,20 @@ services:
       - .env
     environment:
       - MIDDLEWARE_TYPE=tcp_server
-      # - MIDDLEWARE_TYPE=tcp_socket
-      # - MIDDLEWARE_HOST=middleware
-      # - MIDDLEWARE_PORT=9000
+      # Apuntar a ProxySQL en lugar de la DB directa
+      - APP2_DB_HOST=proxysql
+      - APP2_DB_PORT=6033
+      - MIDDLEWARE_NOTIFY_HOST=172.18.0.1
     volumes:
       - ./app2:/usr/src/app
     depends_on:
-      mariadb:
+      proxysql:
         condition: service_healthy
+    networks:
+      - app_network
 
   nginx:
-    image: nginx:latest
+    image: nginx:1.25.4
     volumes:
       - ./nginx_lb/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
@@ -27,23 +31,140 @@ services:
       - "${APP2_SOCKET_PORT:-6002}:6002"
     depends_on:
       - app2
+    networks:
+      - app_network
 
-  mariadb:
-    build: ./mariadb
+  # --- Capa de Enrutamiento y HA ---
+  proxysql:
+    image: proxysql/proxysql:2.5.4
+    volumes:
+      - ./proxysql/conf/proxysql.cnf:/etc/proxysql.cnf
+    ports:
+      - "6032:6032" # Admin Interface
+      - "6033:6033" # Traffic Interface
+    healthcheck:
+      test: ["CMD", "mysql", "-h127.0.0.1", "-P6032", "-uadmin", "-padmin", "-e", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      - db1
+      - db2
+      - db3
+    networks:
+      - app_network
+
+  orchestrator:
+    build: ./orchestrator
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./orchestrator/orchestrator.conf.json:/etc/orchestrator.conf.json
+      - ./orchestrator/scripts/:/scripts/
+      - orchestrator_data:/var/lib/orchestrator
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s # Give it some time to start up before checking
+    depends_on:
+      - db1 # Orchestrator necesita al menos un nodo para descubrir
+    networks:
+      - app_network
+      
+  replication_setup:
+    build: ./orchestrator # Usamos la misma imagen que orchestrator para tener el cliente y mysql
+    environment:
+      - ORCHESTRATOR_API=http://orchestrator:3000/api
+    volumes:
+      - ./setup_replication.sh:/setup_replication.sh
+      # No necesitamos montar docker.sock si no hacemos 'docker exec'
+      #- /var/run/docker.sock:/var/run/docker.sock
+    command: ["/bin/sh", "-c", "chmod +x /setup_replication.sh && /setup_replication.sh"]
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+      db1:
+        condition: service_healthy
+      db2:
+        condition: service_healthy
+      db3:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  # --- Capa de Datos (Cluster Master-Slave) ---
+  db1:
+    image: mariadb:10.5.25
+    command: --server-id=1 --report-host=db1
     environment:
       - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
       - MYSQL_DATABASE=${APP2_DB_NAME}
       - MYSQL_USER=${APP2_DB_USER}
       - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    ports:
-      - "3306:3306"
     volumes:
-      - mariadb_data:/var/lib/mysql
+      - ./mariadb/conf/my.cnf:/etc/mysql/my.cnf
+      - ./mariadb/init_cluster.sql:/docker-entrypoint-initdb.d/init_cluster.sql
+      - ./mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql # Schema de la App
+      - db1_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}"]
+      interval: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  db2:
+    image: mariadb:10.5.25
+    command: --server-id=2 --report-host=db2
+    environment:
+      - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${APP2_DB_NAME}
+      - MYSQL_USER=${APP2_DB_USER}
+      - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
+    volumes:
+      - ./mariadb/conf/my.cnf:/etc/mysql/my.cnf
+      - ./mariadb/init_cluster.sql:/docker-entrypoint-initdb.d/init_cluster.sql
+      - ./mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
+      - db2_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}"]
+      interval: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  db3:
+    image: mariadb:10.5.25
+    command: --server-id=3 --report-host=db3
+    environment:
+      - MYSQL_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${APP2_DB_NAME}
+      - MYSQL_USER=${APP2_DB_USER}
+      - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
+    volumes:
+      - ./mariadb/conf/my.cnf:/etc/mysql/my.cnf
+      - ./mariadb/init_cluster.sql:/docker-entrypoint-initdb.d/init_cluster.sql
+      - ./mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
+      - db3_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}"]
+      interval: 5s
+      retries: 5
+    networks:
+      - app_network
 
 volumes:
-  mariadb_data:
+  db1_data:
+  db2_data:
+  db3_data:
+  orchestrator_data:
+
+networks:
+  app_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+          gateway: 172.18.0.1
