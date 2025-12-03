@@ -16,13 +16,13 @@ wait_for_db() {
     echo "$host está listo."
 }
 
-wait_for_db "db1"
-wait_for_db "db2"
-wait_for_db "db3"
+wait_for_db "app2_db1"
+wait_for_db "app2_db2"
+wait_for_db "app2_db3"
 
 # Configurar DB2 para seguir a DB1
 echo "INFO: Configurando DB2 para seguir a DB1..."
-mysql --host=db2 -uroot -p$DB_ROOT_PASS -e "STOP SLAVE; RESET MASTER; CHANGE MASTER TO MASTER_HOST='db1', MASTER_USER='$REPL_USER', MASTER_PASSWORD='$REPL_PASS', MASTER_PORT=3306, MASTER_USE_GTID=slave_pos; START SLAVE;"
+mysql --host=app2_db2 -uroot -p$DB_ROOT_PASS -e "STOP SLAVE; RESET MASTER; CHANGE MASTER TO MASTER_HOST='app2_db1', MASTER_USER='$REPL_USER', MASTER_PASSWORD='$REPL_PASS', MASTER_PORT=3306, MASTER_USE_GTID=slave_pos; START SLAVE;"
 if [ $? -eq 0 ]; then
     echo "SUCCESS: DB2 configurado como esclavo de DB1."
 else
@@ -31,7 +31,7 @@ fi
 
 # Configurar DB3 para seguir a DB1
 echo "INFO: Configurando DB3 para seguir a DB1..."
-mysql --host=db3 -uroot -p$DB_ROOT_PASS -e "STOP SLAVE; RESET MASTER; CHANGE MASTER TO MASTER_HOST='db1', MASTER_USER='$REPL_USER', MASTER_PASSWORD='$REPL_PASS', MASTER_PORT=3306, MASTER_USE_GTID=slave_pos; START SLAVE;"
+mysql --host=app2_db3 -uroot -p$DB_ROOT_PASS -e "STOP SLAVE; RESET MASTER; CHANGE MASTER TO MASTER_HOST='app2_db1', MASTER_USER='$REPL_USER', MASTER_PASSWORD='$REPL_PASS', MASTER_PORT=3306, MASTER_USE_GTID=slave_pos; START SLAVE;"
 if [ $? -eq 0 ]; then
     echo "SUCCESS: DB3 configurado como esclavo de DB1."
 else
@@ -40,13 +40,13 @@ fi
 
 echo "INFO: Verificando estado de replicación (ejecutando SHOW SLAVE STATUS en DB2 y DB3)..."
 echo "--- DB2 Replication Status ---"
-mysql --host=db2 -uroot -p$DB_ROOT_PASS -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running\|Slave_SQL_Running"
+mysql --host=app2_db2 -uroot -p$DB_ROOT_PASS -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running\|Slave_SQL_Running"
 echo "--- DB3 Replication Status ---"
-mysql --host=db3 -uroot -p$DB_ROOT_PASS -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running\|Slave_SQL_Running"
+mysql --host=app2_db3 -uroot -p$DB_ROOT_PASS -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running\|Slave_SQL_Running"
 
 echo "INFO: Descubriendo topología en Orchestrator..."
 # Orchestrator necesita que le "descubramos" al menos un nodo para escanear el resto
-orchestrator-client -c discover -i db1:3306
+orchestrator-client -c discover -i app2_db1:3306
 if [ $? -eq 0 ]; then
     echo "SUCCESS: Nodo db1 descubierto por Orchestrator."
 else

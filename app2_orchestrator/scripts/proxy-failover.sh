@@ -27,7 +27,7 @@ fi
 
 PROXY_ADMIN_USER="admin"
 PROXY_ADMIN_PASS="admin"
-PROXY_HOST="proxysql"
+PROXY_HOST="app2_proxysql"
 
 mysql -u$PROXY_ADMIN_USER -p$PROXY_ADMIN_PASS -h $PROXY_HOST -P 6032 <<EOF
 -- Mover el nuevo master a HG 10
