@@ -20,10 +20,15 @@ RUN pip install patroni[etcd] psycopg2-binary
 # Copiar configuración
 COPY patroni.yml /etc/patroni.yml
 COPY entrypoint.sh /entrypoint.sh
+COPY create_db.sh /usr/local/bin/create_db.sh
+
 RUN chmod +x /entrypoint.sh
+RUN chmod +x /usr/local/bin/create_db.sh
+
+RUN chown postgres:postgres /entrypoint.sh /etc/patroni.yml /usr/local/bin/create_db.sh
 
 # Cambiar al usuario postgres
-USER postgres
+# USER postgres
 
 # Exponer puertos: 5432 (Postgres), 8008 (Patroni API)
 EXPOSE 5432 8008

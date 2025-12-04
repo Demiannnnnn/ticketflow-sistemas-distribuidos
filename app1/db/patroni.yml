@@ -30,12 +30,18 @@ bootstrap:
   initdb:
   - encoding: UTF8
   - data-checksums
+  post_init: /usr/local/bin/create_db.sh
 
 postgresql:
   listen: 0.0.0.0:5432
   connect_address: {{ip}}:5432
-  data_dir: /var/lib/postgresql/data/patroni
+  data_dir: /var/lib/postgresql/data/patroni/pgdata
   pgpass: /tmp/pgpass
+  pg_hba:
+    - local all all trust
+    - host all all 127.0.0.1/32 trust
+    - host all all 0.0.0.0/0 md5
+    - host replication replicator 0.0.0.0/0 md5
   authentication:
     replication:
       username: replicator
