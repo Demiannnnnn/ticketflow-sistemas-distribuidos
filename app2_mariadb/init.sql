@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
 -- Tabla de Tickets
 CREATE TABLE IF NOT EXISTS tickets (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    external_id VARCHAR(64) NOT NULL UNIQUE COMMENT 'Identificador del Middleware',
+    seat_id VARCHAR(64) NOT NULL  COMMENT 'Identificador del Middleware',
+    event_id VARCHAR(64) NOT NULL  COMMENT 'Identificador del Middleware',
     price FLOAT NOT NULL,
     event_name VARCHAR(128) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

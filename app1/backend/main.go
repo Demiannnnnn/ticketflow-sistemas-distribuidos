@@ -15,12 +15,12 @@ import (
 )
 
 type Seat struct {
-	ID        int       `json:"id"`
-	EventID   int       `json:"event_id"`
-	SeatNumber string   `json:"seat_number"`
-	Status    string    `json:"status"` // available, reserved, sold
+	ID         int        `json:"id"`
+	EventID    int        `json:"event_id"`
+	SeatNumber string     `json:"seat_number"`
+	Status     string     `json:"status"` // available, reserved, sold
 	ReservedAt *time.Time `json:"reserved_at,omitempty"`
-	UserID    *int      `json:"user_id,omitempty"`
+	UserID     *int       `json:"user_id,omitempty"`
 }
 
 type Event struct {
@@ -124,6 +124,12 @@ func main() {
 		api.GET("/events/:id/seats", getSeats)
 		api.POST("/reserve", reserveSeat)
 		api.GET("/instance", getInstance)
+
+		// Falta
+		// 1.- POST /pay --> paySeat
+		// 2.- POST /return --> returnSeat
+		api.POST("/pay", paySeat)
+		api.POST("/return", reserveSeat)
 	}
 
 	port := os.Getenv("PORT")
@@ -239,7 +245,7 @@ func healthCheck(c *gin.Context) {
 
 func getInstance(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"instance": instanceName,
+		"instance":  instanceName,
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
@@ -354,7 +360,7 @@ func reserveSeat(c *gin.Context) {
 
 	if status != "available" {
 		c.JSON(http.StatusConflict, gin.H{
-			"error": "Asiento no disponible",
+			"error":  "Asiento no disponible",
 			"status": status,
 		})
 		return
@@ -396,4 +402,12 @@ func reserveSeat(c *gin.Context) {
 		"reserved_at": now.Format(time.RFC3339),
 		"instance":    instanceName,
 	})
+}
+
+func paySeat(c *gin.Context) {
+
+}
+
+func returnSeat(c *gin.Context) {
+
 }
