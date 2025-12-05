@@ -8,6 +8,8 @@ import (
 	"os"
 	"sync"
 	"time"
+	"bytes" // New import
+	"io"    // New import
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -35,18 +37,25 @@ type Event struct {
 type ReserveRequest struct {
 	SeatID int `json:"seat_id" binding:"required"`
 	UserID int `json:"user_id" binding:"required"`
+	EventID int `json:"event_id" binding:"required"` // Add EventID to the request
 }
 
 var (
 	db           *sql.DB
 	seatMutex    sync.RWMutex
 	instanceName string
+	middlewareReservationURL string // New: Global variable for Middleware URL
 )
 
 func main() {
 	instanceName = os.Getenv("INSTANCE_NAME")
 	if instanceName == "" {
 		instanceName = "app1-unknown"
+	}
+
+	middlewareReservationURL = os.Getenv("MIDDLEWARE_RESERVATION_URL")
+	if middlewareReservationURL == "" {
+		log.Println("WARNING: MIDDLEWARE_RESERVATION_URL no configurado. Las reservas no se enviarán al Middleware.")
 	}
 
 	// Conectar a PostgreSQL
@@ -71,7 +80,7 @@ func main() {
 		dbHost, dbUser, dbPassword, dbName)
 
 	var err error
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 300; i++ {
 		db, err = sql.Open("postgres", connStr)
 		if err == nil {
 			err = db.Ping()
@@ -80,7 +89,7 @@ func main() {
 				break
 			}
 		}
-		log.Printf("Esperando conexión a base de datos... intento %d/30", i+1)
+		log.Printf("Esperando conexión a base de datos... intento %d/300", i+1)
 		time.Sleep(2 * time.Second)
 	}
 
@@ -389,6 +398,9 @@ func reserveSeat(c *gin.Context) {
 
 	log.Printf("[%s] Asiento %d reservado exitosamente por usuario %d", instanceName, req.SeatID, req.UserID)
 
+	// Enviar notificación a Middleware (App1 -> Middleware -> App2)
+	sendReservationToMiddleware(req.SeatID, req.UserID, req.EventID)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message":     "Asiento reservado exitosamente",
 		"seat_id":     req.SeatID,
@@ -396,4 +408,51 @@ func reserveSeat(c *gin.Context) {
 		"reserved_at": now.Format(time.RFC3339),
 		"instance":    instanceName,
 	})
+}
+
+// sendReservationToMiddleware envía los datos de la reserva a un endpoint del Middleware
+func sendReservationToMiddleware(seatID int, userID int, eventID int) {
+	if middlewareReservationURL == "" {
+		log.Println("Middleware URL para reservas no configurada, no se enviará notificación de reserva.")
+		return
+	}
+
+	// Obtener el nombre del evento
+	var eventName string
+	err := db.QueryRow("SELECT name FROM events WHERE id = $1", eventID).Scan(&eventName)
+	if err != nil {
+		log.Printf("Error obteniendo nombre del evento %d: %v", eventID, err)
+		eventName = "Unknown Event" // Fallback si no se puede obtener el nombre
+	}
+
+	// Construir el payload para el Middleware
+	payload := map[string]interface{}{
+		"id":      fmt.Sprintf("%d-%d", eventID, seatID), // ID externo del ticket
+		"price":   10.0,                               // Precio fijo de ejemplo
+		"event":   eventName,
+		"rut":     userID,
+		"event_id": eventID, // Incluir event_id para referencia
+		"seat_id": seatID,   // Incluir seat_id para referencia
+	}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Error serializando payload para Middleware: %v", err)
+		return
+	}
+
+	// Enviar la petición HTTP POST al Middleware
+	resp, err := http.Post(middlewareReservationURL, "application/json", bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		log.Printf("Error enviando reserva a Middleware en %s: %v", middlewareReservationURL, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		log.Printf("Middleware respondió con error %d: %s", resp.StatusCode, string(bodyBytes))
+		return
+	}
+
+	log.Printf("Notificación de reserva enviada a Middleware: %s", jsonPayload)
 }

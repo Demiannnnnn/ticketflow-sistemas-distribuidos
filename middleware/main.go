@@ -18,6 +18,17 @@ type OrderRequest struct {
 	EventID  string `json:"event_id" binding:"required"`
 	UserID   string `json:"user_id" binding:"required"`
 	Quantity int    `json:"quantity" binding:"required"`
+	SeatID   string `json:"seat_id" binding:"required"`
+}
+
+// ReservationRequest representa la estructura de una reserva desde App1
+type ReservationRequest struct {
+	ID        string  `json:"id" binding:"required"` // external_id para App2
+	Price     float64 `json:"price" binding:"required"`
+	Event     string  `json:"event" binding:"required"`
+	Rut       int     `json:"rut" binding:"required"`
+	EventID   int     `json:"event_id" binding:"required"`
+	SeatID    int     `json:"seat_id" binding:"required"`
 }
 
 func main() {
@@ -40,6 +51,24 @@ func main() {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "Orden recibida y enviada a la cola de procesamiento", "order": req})
+	})
+
+	// Endpoint para recibir reservas desde App1
+	router.POST("/reservation", func(c *gin.Context) {
+		var req ReservationRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		err := publishReservationToRabbitMQ(req)
+		if err != nil {
+			log.Printf("Error publicando reserva en RabbitMQ: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno al procesar la reserva"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Reserva recibida y enviada a la cola de procesamiento", "reservation": req})
 	})
 
 	port := os.Getenv("PORT")
@@ -107,5 +136,64 @@ func publishToRabbitMQ(order OrderRequest) error {
 	}
 
 	log.Printf(" [x] Enviada orden %s a la cola %s", body, queueName)
+	return nil
+}
+
+func publishReservationToRabbitMQ(reservation ReservationRequest) error {
+	rabbitmqHost := os.Getenv("RABBITMQ_HOST")
+	if rabbitmqHost == "" {
+		rabbitmqHost = "localhost" // Valor por defecto
+	}
+	rabbitmqURL := fmt.Sprintf("amqp://guest:guest@%s:5672/", rabbitmqHost)
+
+	conn, err := amqp.Dial(rabbitmqURL)
+	if err != nil {
+		return fmt.Errorf("fallo al conectar a RabbitMQ: %w", err)
+	}
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	if err != nil {
+		return fmt.Errorf("fallo al abrir un canal: %w", err)
+	}
+	defer ch.Close()
+
+	queueName := "app1_reservations" // Nueva cola para reservas de App1
+
+	q, err := ch.QueueDeclare(
+		queueName, // name
+		true,      // durable
+		false,     // delete when unused
+		false,     // exclusive
+		false,     // no-wait
+		nil,       // arguments
+	)
+	if err != nil {
+		return fmt.Errorf("fallo al declarar la cola: %w", err)
+	}
+
+	body, err := json.Marshal(reservation)
+	if err != nil {
+		return fmt.Errorf("fallo al serializar la reserva: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = ch.PublishWithContext(ctx,
+		"",        // exchange
+		q.Name,    // routing key
+		false,     // mandatory
+		false,     // immediate
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+			DeliveryMode: amqp.Persistent,
+		})
+	if err != nil {
+		return fmt.Errorf("fallo al publicar el mensaje: %w", err)
+	}
+
+	log.Printf(" [x] Enviada reserva %s a la cola %s", body, queueName)
 	return nil
 }

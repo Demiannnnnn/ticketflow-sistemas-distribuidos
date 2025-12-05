@@ -1,32 +1,9 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Selección de Asientos - {{ event.name if event else 'Evento no encontrado' }}</title>
+{% extends "base.html" %}
+
+{% block title %}Selección de Asientos - {{ event.name if event else 'Evento no encontrado' }}{% endblock %}
+
+{% block extra_css %}
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #f0f2f5;
-            color: #333;
-            margin: 0;
-            padding: 20px;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .header h1 {
-            font-size: 2.5em;
-        }
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
         .seat-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
@@ -71,62 +48,50 @@
             height: 20px;
             border-radius: 3px;
         }
-        .error-box {
-            text-align: center;
-            padding: 20px;
-            margin: 20px;
-            border-radius: 8px;
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        #global-message {
-            text-align: center;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 20px;
-            display: none;
-        }
     </style>
-</head>
-<body>
+{% endblock %}
 
-    <div class="container">
-        <div class="header">
-            <a href="/">&larr; Volver a Eventos</a>
-            <h1>{{ event.name if event else 'Evento no encontrado' }}</h1>
-        </div>
-
-        <div id="global-message"></div>
-
-        {% if error_message %}
-            <div class="error-box">
-                <strong>Error:</strong> {{ error_message }}
-            </div>
-        {% elif event and seats %}
-            <div class="legend">
-                <div class="legend-item"><div class="legend-color" style="background: #c3e6cb;"></div> Disponible</div>
-                <div class="legend-item"><div class="legend-color" style="background: #f5c6cb;"></div> Ocupado</div>
-            </div>
-
-            <div class="seat-grid">
-                {% for seat in seats %}
-                    <div class="seat {{ seat.status }}" 
-                         {% if seat.status == 'available' %}
-                             onclick="reservarAsiento({{ seat.id }}, {{ event.id }})"
-                         {% endif %}
-                         title="Asiento {{ seat.seat_number }}">
-                        {{ seat.seat_number }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-             <div class="error-box">
-                <p>No se encontraron asientos para este evento.</p>
-            </div>
-        {% endif %}
+{% block content %}
+    <div class="header">
+        <a href="/">&larr; Volver a Eventos</a>
+        <h1>{{ event.name if event else 'Evento no encontrado' }}</h1>
     </div>
 
+    <div id="global-message"></div>
+
+    {% if error_message %}
+        <div class="error-box">
+            <strong>Error:</strong> {{ error_message }}
+        </div>
+    {% elif event and seats %}
+        <div class="legend">
+            <div class="legend-item"><div class="legend-color" style="background: #c3e6cb;"></div> Disponible</div>
+            <div class="legend-item"><div class="legend-color" style="background: #f5c6cb;"></div> Ocupado</div>
+        </div>
+
+        <div class="seat-grid">
+            {% for seat in seats %}
+                <div class="seat {{ seat.status }}" 
+                     {% if seat.status == 'available' %}
+                         {% if current_user.is_authenticated %}
+                             onclick="reservarAsiento({{ seat.id }}, {{ event.id }})"
+                         {% else %}
+                             onclick="alert('Debes iniciar sesión para reservar.')"
+                         {% endif %}
+                     {% endif %}
+                     title="Asiento {{ seat.seat_number }}">
+                    {{ seat.seat_number }}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+            <div class="error-box">
+            <p>No se encontraron asientos para este evento.</p>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
     <script>
         function reservarAsiento(seatId, eventId) {
             const messageDiv = document.getElementById('global-message');
@@ -142,8 +107,8 @@
                 },
                 body: JSON.stringify({ 
                     seat_id: seatId,
-                    event_id: eventId,
-                    user_id: 123 // ID de usuario de ejemplo
+                    event_id: eventId
+                    // user_id se maneja en el backend con la sesión
                 })
             })
             .then(response => response.json())
@@ -155,9 +120,8 @@
                 messageDiv.style.backgroundColor = '#d4edda';
                 messageDiv.style.color = '#155724';
 
-                // Redirigir a la página de éxito o refrescar después de un momento
                 setTimeout(() => {
-                    window.location.reload(); // Recarga para ver el estado actualizado del asiento
+                    window.location.reload();
                 }, 2000);
             })
             .catch(error => {
@@ -168,6 +132,4 @@
             });
         }
     </script>
-
-</body>
-</html>
+{% endblock %}

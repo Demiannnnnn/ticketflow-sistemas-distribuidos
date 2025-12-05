@@ -157,3 +157,46 @@ class TicketService:
     @staticmethod
     def get_ticket(user_rut, ticket_id):
         return Ticket.query.filter_by(id=ticket_id, user_rut=user_rut).first()
+
+    @staticmethod
+    def process_order_from_middleware(data):
+        print(f"Processing Order from Middleware: {data}")
+        user_rut = data.get('user_id')
+        event_id = data.get('event_id')
+        seat_id = data.get('seat_id') # New: Get seat_id
+        
+        if not user_rut or not seat_id:
+            print("Error: Order without User ID or Seat ID")
+            return
+
+        user = User.query.filter_by(rut=user_rut).first()
+        full_name_for_log = ""
+        if not user:
+             print(f"User {user_rut} not found in App2. Creating placeholder...")
+             full_name_for_log = "Usuario Web App3"
+             user = User(rut=user_rut, full_name=full_name_for_log)
+             db.session.add(user)
+             db.session.commit()
+        else:
+             full_name_for_log = user.full_name
+        
+        print(f"Order received for User {full_name_for_log} (RUT {user_rut}) for Event {event_id}, Seat {seat_id}")
+
+        # Now, find the ticket and process it
+        ticket = Ticket.query.filter_by(external_id=seat_id, user_rut=user_rut).first()
+
+        if not ticket:
+            print(f"ERROR: Ticket with external_id {seat_id} not found for user {user_rut}. Was TCP message from App1 received?")
+            return
+        
+        if ticket.status == TicketStatus.PENDING_PAYMENT:
+            print(f"Processing payment for ticket {ticket.id} (external_id: {seat_id}) for user {user_rut}")
+            # Assume dummy payment for now. In a real system, payment details would come from App3.
+            if TicketService.process_payment(user_rut=user_rut, ticket_id=ticket.id):
+                print(f"SUCCESS: Ticket {ticket.id} paid for user {user_rut}")
+            else:
+                print(f"ERROR: Failed to process payment for ticket {ticket.id} for user {user_rut}")
+        elif ticket.status == TicketStatus.PAID:
+            print(f"INFO: Ticket {ticket.id} (external_id: {seat_id}) for user {user_rut} already paid.")
+        else:
+            print(f"INFO: Ticket {ticket.id} (external_id: {seat_id}) for user {user_rut} has status {ticket.status}, not processing payment.")

@@ -12,14 +12,16 @@ services:
       - MIDDLEWARE_TYPE=tcp_server
       - APP2_DB_HOST=app2_proxysql
       - APP2_DB_PORT=6033
-      - MIDDLEWARE_NOTIFY_HOST=172.18.0.1
+      - MIDDLEWARE_NOTIFY_HOST=middleware
+      - RABBITMQ_HOST=rabbitmq
     volumes:
       - ./app2:/usr/src/app
     depends_on:
-      app2_proxysql:
+      - service: app2_proxysql
         condition: service_healthy
     networks:
       - app2_network
+      - ticketflow_network
 
   app2_nginx:
     image: nginx:1.25.4
@@ -32,6 +34,7 @@ services:
       - app2
     networks:
       - app2_network
+      - ticketflow_network
 
   # --- Capa de Enrutamiento y HA ---
   app2_proxysql:
@@ -80,13 +83,13 @@ services:
       - ./app2_scripts/setup_replication.sh:/setup_replication.sh
     command: ["/bin/sh", "-c", "chmod +x /setup_replication.sh && /setup_replication.sh"]
     depends_on:
-      app2_orchestrator:
+      - service: app2_orchestrator
         condition: service_healthy
-      app2_db1:
+      - service: app2_db1
         condition: service_healthy
-      app2_db2:
+      - service: app2_db2
         condition: service_healthy
-      app2_db3:
+      - service: app2_db3
         condition: service_healthy
     networks:
       - app2_network
@@ -166,6 +169,7 @@ services:
       - "2379:2379"
     networks:
       - ticketflow_network
+      - app1_db_network
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -206,8 +210,8 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=***REMOVED***
       - DB_NAME=ticketflow
-    depends_on:
-      - haproxy
+      - MIDDLEWARE_RESERVATION_URL=http://middleware:8000/reservation
+    depends_on: []
     networks:
       - ticketflow_network
     healthcheck:
@@ -228,6 +232,7 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=***REMOVED***
       - DB_NAME=ticketflow
+      - MIDDLEWARE_RESERVATION_URL=http://middleware:8000/reservation
     depends_on:
       - haproxy
     networks:
@@ -248,9 +253,14 @@ services:
     volumes:
       - patroni_master_data:/var/lib/postgresql/data/patroni
     networks:
-      - ticketflow_network
+      - app1_db_network
     depends_on:
       - etcd
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   patroni_slave:
     build: ./app1/db
@@ -261,10 +271,15 @@ services:
     volumes:
       - patroni_slave_data:/var/lib/postgresql/data/patroni
     networks:
-      - ticketflow_network
+      - app1_db_network
     depends_on:
       - etcd
       - patroni_master
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   haproxy:
     image: haproxy:2.8-alpine
@@ -278,9 +293,12 @@ services:
       - ./app1/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     networks:
       - ticketflow_network
+      - app1_db_network
     depends_on:
-      - patroni_master
-      - patroni_slave
+      - service: patroni_master
+        condition: service_healthy
+      - service: patroni_slave
+        condition: service_healthy
       # I removed the dependency on mariadb_master here because it will be managed by app2_proxysql
 
   # ========================================
@@ -293,10 +311,35 @@ services:
       - "5003:5000"
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - DB_HOST=app3_db
+      - DB_USER=***REMOVED***
+      - DB_PASSWORD=***REMOVED***
+      - DB_NAME=***REMOVED***s
     depends_on:
-      - rabbitmq
+      - service: rabbitmq
+        condition: service_started
+      - service: app3_db
+        condition: service_healthy
     networks:
       - ticketflow_network
+      - app3_db_network
+
+  app3_db:
+    image: mariadb:10.5.25
+    container_name: app3_db
+    environment:
+      - MYSQL_ROOT_PASSWORD=***REMOVED***
+      - MYSQL_DATABASE=***REMOVED***s
+      - MYSQL_USER=***REMOVED***
+      - MYSQL_PASSWORD=***REMOVED***
+    volumes:
+      - app3_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u***REMOVED***", "-p***REMOVED***"]
+      interval: 5s
+      retries: 5
+    networks:
+      - app3_db_network
 
   middleware:
     build: ./middleware
@@ -318,13 +361,26 @@ volumes:
   patroni_master_data:
   patroni_slave_data:
   rabbitmq_data:
+  app3_db_data:
 
 networks:
+  app1_db_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+          gateway: 172.29.0.1
+  app3_db_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+          gateway: 172.30.0.1
   app2_network:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.18.0.0/16
-          gateway: 172.18.0.1
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
   ticketflow_network:
     driver: bridge

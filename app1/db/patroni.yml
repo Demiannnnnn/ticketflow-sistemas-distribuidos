@@ -38,10 +38,8 @@ postgresql:
   data_dir: /var/lib/postgresql/data/patroni/pgdata
   pgpass: /tmp/pgpass
   pg_hba:
-    - local all all trust
-    - host all all 127.0.0.1/32 trust
-    - host all all 0.0.0.0/0 md5
     - host replication replicator 0.0.0.0/0 md5
+    - host all all 0.0.0.0/0 md5
   authentication:
     replication:
       username: replicator
@@ -49,8 +47,8 @@ postgresql:
     superuser:
       username: postgres
       password: ***REMOVED***
-    parameters:
-      unix_socket_directories: '.'
+  parameters:
+    unix_socket_directories: '.'
 
 tags:
   nofailover: false
