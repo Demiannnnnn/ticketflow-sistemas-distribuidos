@@ -173,6 +173,22 @@ services:
     networks:
       - ticketflow_network
 
+  orchestrator:
+    image: openarkcode/orchestrator:latest
+    container_name: ticketflow_orchestrator
+    ports:
+      - "3000:3000"
+    environment:
+      - ORC_TOPOLOGY_USER=orchestrator
+      - ORC_TOPOLOGY_PASSWORD=***REMOVED***
+      - ORC_DB_USER=orc_user
+      - ORC_DB_PASSWORD=***REMOVED***
+    depends_on:
+      - mariadb_master
+      - mariadb_slave
+    networks:
+      - ticketflow_network
+
   app2:
     build: ./app2
     container_name: ticketflow_app2
