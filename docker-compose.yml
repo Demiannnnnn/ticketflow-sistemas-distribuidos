@@ -60,7 +60,8 @@ services:
       - DB_PASSWORD=***REMOVED***
       - DB_NAME=ticketflow
     depends_on:
-      - haproxy
+      haproxy:
+        condition: service_healthy
     links:
       - haproxy
     networks:
@@ -84,7 +85,8 @@ services:
       - DB_PASSWORD=***REMOVED***
       - DB_NAME=ticketflow
     depends_on:
-      - haproxy
+      haproxy:
+        condition: service_healthy
     links:
       - haproxy
     networks:
