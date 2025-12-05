@@ -1,9 +1,54 @@
 import os
 import requests
 import json
-from flask import Flask, render_template, request, jsonify
+import pymysql
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'un-secret-muy-secreto')
+
+# ========================================
+# DB CONFIG
+# ========================================
+db_host = os.environ.get('APP3_DB_HOST')
+db_user = os.environ.get('APP3_DB_USER')
+db_password = os.environ.get('APP3_DB_PASSWORD')
+db_name = os.environ.get('APP3_DB_NAME')
+
+def get_db_connection():
+    return pymysql.connect(host=db_host,
+                             user=db_user,
+                             password=db_password,
+                             database=db_name,
+                             cursorclass=pymysql.cursors.DictCursor)
+
+# ========================================
+# LOGIN & BCRYPT
+# ========================================
+bcrypt = Bcrypt(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+login_manager.login_message_category = 'info'
+
+class User(UserMixin):
+    def __init__(self, id, full_name, email, password_hash):
+        self.id = id
+        self.full_name = full_name
+        self.email = email
+        self.password_hash = password_hash
+
+@login_manager.user_loader
+def load_user(user_id):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM users WHERE rut = %s", (user_id,))
+        user_data = cursor.fetchone()
+    conn.close()
+    if user_data:
+        return User(id=user_data['rut'], full_name=user_data['full_name'], email=user_data['email'], password_hash=user_data['password_hash'])
+    return None
 
 # URLs de servicios
 APP1_API_URL = "http://nginx/api/events"
@@ -29,6 +74,7 @@ def index():
     return render_template('index.html', events=events, error_message=error_message)
 
 @app.route('/evento/<int:event_id>/asientos')
+@login_required
 def ver_asientos(event_id):
     """
     Muestra los asientos para un evento específico.
@@ -60,6 +106,7 @@ def ver_asientos(event_id):
     return render_template('seats.html', event=event, seats=seats, error_message=error_message)
 
 @app.route('/reservar_asiento', methods=['POST'])
+@login_required
 def reservar_asiento():
     """
     Endpoint para reservar un asiento.
@@ -68,7 +115,7 @@ def reservar_asiento():
     """
     data = request.get_json()
     seat_id = data.get('seat_id')
-    user_id = data.get('user_id')
+    user_id = current_user.id
     event_id = data.get('event_id')
 
     # Paso 1: Intentar reservar el asiento en App1
@@ -109,6 +156,70 @@ def reservar_asiento():
         'message': '¡Reserva y orden de facturación procesadas exitosamente!'
     }), 200
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('profile'))
+    if request.method == 'POST':
+        rut = request.form.get('rut')
+        full_name = request.form.get('full_name')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            try:
+                cursor.execute("INSERT INTO users (rut, full_name, email, password_hash) VALUES (%s, %s, %s, %s)", 
+                               (rut, full_name, email, hashed_password))
+                conn.commit()
+                flash('Tu cuenta ha sido creada! Ya puedes iniciar sesión.', 'success')
+                return redirect(url_for('login'))
+            except pymysql.err.IntegrityError:
+                flash('El RUT o email ya existen.', 'danger')
+        conn.close()
+        
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('profile'))
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        user = load_user_by_email(email)
+
+        if user and bcrypt.check_password_hash(user.password_hash, password):
+            login_user(user, remember=True)
+            next_page = request.args.get('next')
+            return redirect(next_page) if next_page else redirect(url_for('profile'))
+        else:
+            flash('Inicio de sesión fallido. Por favor, revisa tu email y contraseña.', 'danger')
+            
+    return render_template('login.html')
+
+def load_user_by_email(email):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+        user_data = cursor.fetchone()
+    conn.close()
+    if user_data:
+        return User(id=user_data['rut'], full_name=user_data['full_name'], email=user_data['email'], password_hash=user_data['password_hash'])
+    return None
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+@app.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html', user=current_user)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
