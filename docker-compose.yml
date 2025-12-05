@@ -139,6 +139,11 @@ services:
       - patroni_master
       - patroni_slave
       - mariadb_master
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ========================================
   # APP2 - FACTURACIÓN (Python + MariaDB HA)
