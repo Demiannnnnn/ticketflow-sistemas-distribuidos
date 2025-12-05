@@ -144,3 +144,50 @@ def use_ticket(ticket_id):
     else:
         flash('Could not use ticket.', 'danger')
     return redirect(url_for('ticket.my_tickets'))
+
+# --- API Routes (for middleware integration) ---
+
+@ticket_bp.route('/api/tickets', methods=['POST'])
+def create_ticket_from_middleware():
+    """
+    Endpoint para recibir tickets desde el middleware.
+    Espera JSON con: seat_id, event_id, user_id (rut), price, event_name
+    """
+    try:
+        data = request.get_json()
+        
+        # Validar datos requeridos
+        required_fields = ['seat_id', 'event_id', 'user_id', 'event_name']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        # Extraer datos
+        seat_id = str(data['seat_id'])
+        event_id = str(data['event_id'])
+        user_rut = int(data['user_id'])
+        price = float(data.get('price', 0))
+        event_name = str(data['event_name'])
+        
+        # Crear ticket usando el servicio
+        ticket = TicketService.create_ticket(
+            user_rut=user_rut,
+            seat_id=seat_id,
+            event_id=event_id,
+            price=price,
+            event_name=event_name
+        )
+        
+        if ticket:
+            return jsonify({
+                'message': 'Ticket created successfully',
+                'ticket_id': ticket.id,
+                'status': ticket.status.value
+            }), 201
+        else:
+            return jsonify({'error': 'Failed to create ticket'}), 500
+            
+    except ValueError as e:
+        return jsonify({'error': f'Invalid data format: {str(e)}'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500

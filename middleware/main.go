@@ -297,7 +297,51 @@ func publishToRabbitMQ(order OrderRequest) error {
 }
 
 func ticketToTickets(c *gin.Context) {
+	// Leer el body del request
+	var ticketData map[string]interface{}
+	if err := c.ShouldBindJSON(&ticketData); err != nil {
+		log.Printf("Error al parsear ticket: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos de ticket inválidos"})
+		return
+	}
 
-	// puerto 6002 host app2_nginx
+	log.Printf("Recibido ticket para App2: %+v", ticketData)
 
+	// Construir URL de App2 (vía nginx de app2)
+	targetURL := "http://app2_nginx:80/api/tickets"
+
+	// Serializar los datos
+	jsonData, err := json.Marshal(ticketData)
+	if err != nil {
+		log.Printf("Error al serializar ticket: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno"})
+		return
+	}
+
+	// Crear request a App2
+	req, err := http.NewRequest("POST", targetURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Error creando request a App2: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno"})
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Enviar request
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Error enviando ticket a App2: %v", err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "No se pudo conectar con el servicio de facturación"})
+		return
+	}
+	defer resp.Body.Close()
+
+	// Leer respuesta de App2
+	bodyBytes, _ := io.ReadAll(resp.Body)
+
+	log.Printf("Respuesta de App2 (Status %d): %s", resp.StatusCode, string(bodyBytes))
+
+	// Devolver la respuesta de App2 al cliente
+	c.Data(resp.StatusCode, "application/json", bodyBytes)
 }

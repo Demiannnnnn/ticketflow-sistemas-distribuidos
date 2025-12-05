@@ -156,16 +156,43 @@ def reservar_asiento():
     """
     Endpoint para reservar un asiento.
     1. Llama a App1 para reservar el asiento.
-    2. Si tiene éxito, llama al Middleware para encolar la facturación.
+    2. Si tiene éxito, llama al Middleware para crear el ticket en App2.
     """
+    # Verificar autenticación manualmente (para API JSON)
+    if not current_user.is_authenticated:
+        return jsonify({"error": "Debes iniciar sesión para reservar"}), 401
+    
     data = request.get_json()
     seat_id = data.get("seat_id")
-    user_id = data.get("user_id")
     event_id = data.get("event_id")
+    
+    # Obtener user_id de la sesión (usuario autenticado)
+    user_id = current_user.rut
+    
+    if not seat_id or not event_id:
+        return jsonify({"error": "Faltan datos requeridos"}), 400
+
+    # Obtener información del evento para el ticket
+    try:
+        events_response = requests.get(APP1_API_URL, timeout=5)
+        events_response.raise_for_status()
+        events = events_response.json().get("events", [])
+        event = next((e for e in events if e.get("id") == int(event_id)), None)
+        
+        if not event:
+            return jsonify({"error": "Evento no encontrado"}), 404
+            
+        event_name = event.get("name", "Evento Desconocido")
+        price = event.get("price", 0)  # Asumiendo que el evento tiene precio
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error obteniendo información del evento: {e}")
+        event_name = "Evento Desconocido"
+        price = 0
 
     # Paso 1: Intentar reservar el asiento en App1
     try:
-        reserve_payload = {"seat_id": seat_id, "user_id": user_id}
+        reserve_payload = {"seat_id": int(seat_id), "user_id": int(user_id)}
         response_app1 = requests.post(APP1_RESERVE_URL, json=reserve_payload, timeout=5)
 
         if response_app1.status_code != 200:
@@ -183,29 +210,35 @@ def reservar_asiento():
             {"error": "No se pudo conectar con el servicio de reservas (App1)"}
         ), 503
 
-    # Paso 2: Si la reserva en App1 tuvo éxito, enviar a APP2_TICKET
+    # Paso 2: Si la reserva en App1 tuvo éxito, enviar ticket a App2 vía Middleware
     try:
-        ticket = {"seat_id": seat_id, "event_id": event_id, "user_id": user_id}
-        response_app1 = requests.post(APP2_TICKET, json=ticket, timeout=5)
+        ticket = {
+            "seat_id": str(seat_id),
+            "event_id": str(event_id),
+            "user_id": int(user_id),
+            "event_name": event_name,
+            "price": price
+        }
+        response_ticket = requests.post(APP2_TICKET, json=ticket, timeout=5)
 
-        if response_app1.status_code != 200:
-            # Si App1 falla la reserva (ej: asiento ocupado), retornar el error.
-            error_details = response_app1.json().get(
-                "error", "Error desconocido en App1"
-            )
+        if response_ticket.status_code not in [200, 201]:
+            # Si falla la creación del ticket, loguear pero no fallar la reserva
+            print(f"Advertencia: No se pudo crear el ticket en App2: {response_ticket.text}")
+            # La reserva ya se hizo, así que devolvemos éxito pero con advertencia
             return jsonify(
-                {"error": f"App1 no pudo reservar el asiento: {error_details}"}
-            ), response_app1.status_code
+                {"message": "Asiento reservado, pero hubo un problema al crear el ticket. Contacte soporte."}
+            ), 200
 
     except requests.exceptions.RequestException as e:
-        print(f"Error de conexión con App1 al reservar: {e}")
+        print(f"Error de conexión con Middleware al crear ticket: {e}")
+        # La reserva ya se hizo, así que devolvemos éxito pero con advertencia
         return jsonify(
-            {"error": "No se pudo conectar con el servicio de reservas (App1)"}
-        ), 503
+            {"message": "Asiento reservado, pero hubo un problema al crear el ticket. Contacte soporte."}
+        ), 200
 
     # Si todo fue bien:
     return jsonify(
-        {"message": "¡Reserva y orden de facturación procesadas exitosamente!"}
+        {"message": "¡Reserva y ticket creados exitosamente!"}
     ), 200
 
 

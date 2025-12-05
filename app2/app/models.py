@@ -1,7 +1,6 @@
 from datetime import datetime
 import enum
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Nullable
 from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
@@ -35,7 +34,7 @@ class Ticket(db.Model):
     __tablename__ = "tickets"
     id = db.Column(db.Integer, primary_key=True)
     seat_id = db.Column(db.String(64), nullable=False)
-    event_id = db.Column(db.String(64), Nullable=False)
+    event_id = db.Column(db.String(64), nullable=False)
     price = db.Column(db.Float, nullable=False)
     event_name = db.Column(db.String(128), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

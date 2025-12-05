@@ -170,3 +170,17 @@ class TicketService:
     @staticmethod
     def get_ticket(user_rut, ticket_id):
         return Ticket.query.filter_by(id=ticket_id, user_rut=user_rut).first()
+
+    @staticmethod
+    def create_ticket(user_rut, seat_id, event_id, price, event_name):
+        """
+        Crea un nuevo ticket. Wrapper de receive_external_ticket para mayor claridad.
+        """
+        ticket_data = {
+            "rut": user_rut,
+            "seat_id": seat_id,
+            "event_id": event_id,
+            "price": price,
+            "event": event_name
+        }
+        return TicketService.receive_external_ticket(ticket_data)

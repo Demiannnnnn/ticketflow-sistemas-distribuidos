@@ -42,17 +42,7 @@ services:
       - "6032:6032"
       - "6033:6033"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mysql",
-          "-h127.0.0.1",
-          "-P6032",
-          "-uadmin",
-          "-padmin",
-          "-e",
-          "SELECT 1",
-        ]
+      test: [ "CMD", "mysql", "-h127.0.0.1", "-P6032", "-uadmin", "-padmin", "-e", "SELECT 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -72,7 +62,7 @@ services:
       - ./app2_orchestrator/scripts/:/scripts/
       - app2_orchestrator_data:/var/lib/orchestrator
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: [ "CMD", "curl", "-f", "http://localhost:3000" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -88,12 +78,7 @@ services:
       - ORCHESTRATOR_API=http://app2_orchestrator:3000/api
     volumes:
       - ./app2_scripts/setup_replication.sh:/setup_replication.sh
-    command:
-      [
-        "/bin/sh",
-        "-c",
-        "chmod +x /setup_replication.sh && /setup_replication.sh",
-      ]
+    command: [ "/bin/sh", "-c", "chmod +x /setup_replication.sh && /setup_replication.sh" ]
     depends_on:
       app2_orchestrator:
         condition: service_healthy
@@ -121,16 +106,7 @@ services:
       - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
       - app2_db1_data:/var/lib/mysql
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-u${APP2_DB_USER}",
-          "-p${APP2_DB_PASSWORD}",
-        ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}" ]
       interval: 5s
       retries: 5
     networks:
@@ -150,16 +126,7 @@ services:
       - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
       - app2_db2_data:/var/lib/mysql
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-u${APP2_DB_USER}",
-          "-p${APP2_DB_PASSWORD}",
-        ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}" ]
       interval: 5s
       retries: 5
     networks:
@@ -179,16 +146,7 @@ services:
       - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
       - app2_db3_data:/var/lib/mysql
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-u${APP2_DB_USER}",
-          "-p${APP2_DB_PASSWORD}",
-        ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}" ]
       interval: 5s
       retries: 5
     networks:
@@ -253,15 +211,7 @@ services:
     networks:
       - ticketflow_network
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost:8080/health",
-        ]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -283,15 +233,7 @@ services:
     networks:
       - ticketflow_network
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost:8080/health",
-        ]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -341,9 +283,9 @@ services:
       - patroni_slave
       # I removed the dependency on mariadb_master here because it will be managed by app2_proxysql
 
-  # ========================================
-  # APP3 & MIDDLEWARE
-  # ========================================
+      # ========================================
+      # APP3 & MIDDLEWARE
+      # ========================================
   app3:
     build: ./app3
     container_name: ticketflow_app3
@@ -351,8 +293,15 @@ services:
       - "5003:5000"
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - DB_HOST=app3_db
+      - DB_USER=***REMOVED***
+      - DB_PASSWORD=***REMOVED***
+      - DB_NAME=***REMOVED***s
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_started
+      app3_db:
+        condition: service_healthy
     networks:
       - ticketflow_network
 
@@ -367,6 +316,7 @@ services:
       - rabbitmq
     networks:
       - ticketflow_network
+      - app2_network
 
   app3_db:
     image: mariadb:10.5.25
@@ -379,16 +329,7 @@ services:
     volumes:
       - app3_db_data:/var/lib/mysql
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-u***REMOVED***",
-          "-p***REMOVED***",
-        ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u***REMOVED***", "-p***REMOVED***" ]
       interval: 5s
       retries: 5
     networks:
@@ -402,6 +343,8 @@ volumes:
   patroni_master_data:
   patroni_slave_data:
   rabbitmq_data:
+  app3_db_data:
+
 
 networks:
   app2_network:
