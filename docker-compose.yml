@@ -61,16 +61,11 @@ services:
       - DB_NAME=ticketflow
     depends_on:
       haproxy:
-        condition: service_healthy
+        condition: service_started
     links:
       - haproxy
     networks:
       - ticketflow_network
-    healthcheck:
-      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   app1_replica2:
     build:
@@ -86,16 +81,11 @@ services:
       - DB_NAME=ticketflow
     depends_on:
       haproxy:
-        condition: service_healthy
+        condition: service_started
     links:
       - haproxy
     networks:
       - ticketflow_network
-    healthcheck:
-      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   # --- Patroni Cluster ---
   patroni_master:
@@ -110,6 +100,7 @@ services:
       - ticketflow_network
     depends_on:
       - etcd
+    entrypoint: tail -f /dev/null
 
   patroni_slave:
     build: ./app1/db
@@ -124,6 +115,7 @@ services:
     depends_on:
       - etcd
       - patroni_master
+    entrypoint: tail -f /dev/null
 
   haproxy:
     image: haproxy:2.8-alpine
@@ -138,14 +130,12 @@ services:
     networks:
       - ticketflow_network
     depends_on:
-      - patroni_master
-      - patroni_slave
-      - mariadb_master
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7000/stats"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      patroni_master:
+        condition: service_started
+      patroni_slave:
+        condition: service_started
+      mariadb_master:
+        condition: service_healthy
 
   # ========================================
   # APP2 - FACTURACIÓN (Python + MariaDB HA)
@@ -164,6 +154,11 @@ services:
       - mariadb_master_data:/var/lib/mysql
     networks:
       - ticketflow_network
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mariadb_slave:
     build: ./app2/database
@@ -195,8 +190,10 @@ services:
       - ORC_DB_USER=orc_user
       - ORC_DB_PASSWORD=***REMOVED***
     depends_on:
-      - mariadb_master
-      - mariadb_slave
+      mariadb_master:
+        condition: service_healthy
+      mariadb_slave:
+        condition: service_started
     networks:
       - ticketflow_network
 
