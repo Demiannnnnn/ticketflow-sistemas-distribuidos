@@ -205,6 +205,21 @@ services:
   # ========================================
   # APP3 & MIDDLEWARE
   # ========================================
+  app3_mariadb:
+    build: ./app3/database
+    container_name: app3_mariadb
+    ports:
+      - "3308:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${APP3_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${APP3_DB_NAME}
+      - MYSQL_USER=${APP3_DB_USER}
+      - MYSQL_PASSWORD=${APP3_DB_PASSWORD}
+    volumes:
+      - app3_mariadb_data:/var/lib/mysql
+    networks:
+      - ticketflow_network
+
   app3:
     build: ./app3
     container_name: ticketflow_app3
@@ -214,6 +229,7 @@ services:
       - RABBITMQ_HOST=rabbitmq
     depends_on:
       - rabbitmq
+      - app3_mariadb
     networks:
       - ticketflow_network
 
@@ -238,4 +254,5 @@ volumes:
   patroni_slave_data:
   mariadb_master_data:
   mariadb_slave_data:
+  app3_mariadb_data:
   rabbitmq_data:
