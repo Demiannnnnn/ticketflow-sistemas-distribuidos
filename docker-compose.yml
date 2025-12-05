@@ -173,17 +173,6 @@ services:
     networks:
       - ticketflow_network
 
-  orchestrator:
-    image: openark/orchestrator
-    container_name: ticketflow_orchestrator
-    ports:
-      - "3000:3000"
-    networks:
-      - ticketflow_network
-    depends_on:
-      - mariadb_master
-      - mariadb_slave
-
   app2:
     build: ./app2
     container_name: ticketflow_app2
@@ -225,6 +214,8 @@ services:
     container_name: ticketflow_app3
     ports:
       - "5003:5000"
+    env_file:
+      - .env
     environment:
       - RABBITMQ_HOST=rabbitmq
     depends_on:

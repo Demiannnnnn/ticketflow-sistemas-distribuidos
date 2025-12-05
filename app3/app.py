@@ -7,8 +7,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
-app.config.from_envvar('APP_SETTINGS', silent=True)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'un-secret-muy-secreto')
+app.config['SECRET_KEY'] = 'un-secret-muy-secreto'
 
 # ========================================
 # DB CONFIG

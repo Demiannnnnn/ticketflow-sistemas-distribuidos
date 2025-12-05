@@ -1,26 +1,12 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Perfil</title>
-    <style>
-        body { font-family: sans-serif; background: #f0f2f5; }
-        .container { max-width: 600px; margin: 50px auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #333; }
-        p { font-size: 1.2em; }
-        .logout { float: right; }
-        a { color: #007bff; }
-    </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Mi Perfil{% endblock %}
+
+{% block content %}
     <div class="container">
-        <a href="{{ url_for('logout') }}" class="logout">Cerrar Sesión</a>
         <h1>Bienvenido, {{ user.full_name }}!</h1>
         <p><strong>RUT:</strong> {{ user.id }}</p>
         <p><strong>Email:</strong> {{ user.email }}</p>
         <hr>
         <p><a href="{{ url_for('index') }}">Volver a la lista de eventos</a></p>
     </div>
-</body>
-</html>
+{% endblock %}
