@@ -106,17 +106,17 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
 ## 1. 🔗 Integración del Sistema (Cross-Cutting)
 
 ### 1.1 Unificar Redes Docker
-- [ ] 🔴 Conectar `app2` y `app2_nginx` a `ticketflow_network` en `docker-compose.yml`
-- [ ] 🔴 Conectar `middleware` a `app2_network` (o usar red compartida)
+- [x] 🔴 Conectar `app2` y `app2_nginx` a `ticketflow_network` en `docker-compose.yml` ✅
+- [x] 🔴 Conectar `middleware` a `app2_network` (o usar red compartida) ✅
 - [ ] 🟡 Documentar el mapa de redes y puertos en el README
 
 ### 1.2 Resolver Integración Middleware ↔ App2
-- [ ] 🔴 **Opción A (Recomendada):** Implementar un consumidor RabbitMQ nativo en App2 usando `pika` (ya está en `requirements.txt` pero no se usa), que consuma de la cola `orden_creada` y ejecute `TicketService.receive_external_ticket()`
+- [x] 🔴 **Opción A (Recomendada):** Implementar un consumidor RabbitMQ nativo en App2 usando `pika` (ya está en `requirements.txt`), que consuma de la cola `orden_creada` y ejecute `TicketService.receive_external_ticket()` ✅
 - [ ] 🔴 **Opción B:** Actualizar el Middleware en Go para que consuma de RabbitMQ y reenvíe a App2 vía TCP socket
-- [ ] 🔴 Implementar listener TCP en el Middleware (puerto 7002) para recibir notificaciones de App2 (`TICKET_PAID`, `TICKET_REFUNDED`)
+- [x] 🔴 Implementar listener TCP en el Middleware (puerto 7002) para recibir notificaciones de App2 (`TICKET_PAID`, `TICKET_REFUNDED`) ✅
 
 ### 1.3 Estandarizar Contrato de Datos (DTOs)
-- [ ] 🔴 Definir un esquema unificado de mensaje entre las 3 apps:
+- [x] 🔴 Definir un esquema unificado de mensaje entre las 3 apps: ✅
   ```json
   {
     "order_id": "UUID",
@@ -128,18 +128,18 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
     "timestamp": "ISO-8601"
   }
   ```
-- [ ] 🔴 Actualizar App3, Middleware y App2 para usar este esquema
-- [ ] 🟠 Agregar validación de esquema en cada punto de entrada
+- [x] 🔴 Actualizar App3, Middleware y App2 para usar este esquema ✅
+- [x] 🟠 Agregar validación de esquema en cada punto de entrada ✅
 
 ### 1.4 Implementar Flujo de Identidad de Usuario
-- [ ] 🔴 Eliminar `user_id: 123` hardcodeado en App3
-- [ ] 🔴 Implementar formulario de ingreso de RUT en App3 (o sesión compartida)
-- [ ] 🟠 Propagar el RUT a través de todo el flujo: App3 → App1 → Middleware → App2
+- [x] 🔴 Eliminar `user_id: 123` hardcodeado en App3 ✅
+- [x] 🔴 Implementar formulario de ingreso de RUT en App3 (o sesión compartida) ✅
+- [x] 🟠 Propagar el RUT a través de todo el flujo: App3 → App1 → Middleware → App2 ✅
 
 ### 1.5 Transacciones Distribuidas / Patrón Saga
-- [ ] 🟠 Implementar compensación: si el Middleware falla tras la reserva en App1, liberar el asiento automáticamente
-- [ ] 🟠 Agregar endpoint `DELETE /api/reserve` o `POST /api/reserve/:id/cancel` en App1
-- [ ] 🟠 App3 debe retornar error real (no HTTP 200) cuando la facturación falla
+- [x] 🟠 Implementar compensación: si el Middleware falla tras la reserva en App1, liberar el asiento automáticamente ✅
+- [x] 🟠 Agregar endpoint `DELETE /api/reserve` o `POST /api/reserve/:id/cancel` en App1 ✅
+- [x] 🟠 App3 debe retornar error real (no HTTP 200) cuando la facturación falla ✅
 
 ---
 
@@ -159,25 +159,25 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
   │   └── worker/       # Background jobs
   ```
 - [ ] 🟡 Migrar de `lib/pq` (en modo mantenimiento) a `jackc/pgx/v5`
-- [ ] 🟡 Reemplazar `[]map[string]interface{}` por structs tipados en respuestas JSON
+- [x] 🟡 Reemplazar `[]map[string]interface{}` por structs tipados en respuestas JSON ✅
 
 ### 2.2 Bugs y Problemas Críticos del Backend
-- [ ] 🔴 **Eliminar `sync.RWMutex`**: El mutex en memoria NO sincroniza entre réplicas distribuidas. Solo `SELECT ... FOR UPDATE` de PostgreSQL provee protección real. El mutex además bloquea lecturas innecesariamente
-- [ ] 🔴 **Race condition en `initDB()`**: Cuando ambas réplicas arrancan simultáneamente, ambas ejecutan `insertSampleData()` causando duplicados. Solución: usar `golang-migrate` o `goose` para migraciones
-- [ ] 🟠 Configurar pool de conexiones DB: `SetMaxOpenConns()`, `SetMaxIdleConns()`, `SetConnMaxLifetime()`
-- [ ] 🟠 Implementar `Graceful Shutdown` con `http.Server` + `signal.NotifyContext`
-- [ ] 🟡 Validar parámetros de ruta (`:id` debe ser int válido)
+- [x] 🔴 **Eliminar `sync.RWMutex`**: El mutex en memoria NO sincroniza entre réplicas distribuidas. Solo `SELECT ... FOR UPDATE` de PostgreSQL provee protección real. El mutex además bloquea lecturas innecesariamente ✅
+- [x] 🔴 **Race condition en `initDB()`**: Cuando ambas réplicas arrancan simultáneamente, ambas ejecutan `insertSampleData()` causando duplicados. Solución: usar `pg_advisory_lock` y `ON CONFLICT DO NOTHING` ✅
+- [x] 🟠 Configurar pool de conexiones DB: `SetMaxOpenConns()`, `SetMaxIdleConns()`, `SetConnMaxLifetime()` ✅
+- [x] 🟠 Implementar `Graceful Shutdown` con `http.Server` + `signal.NotifyContext` ✅
+- [x] 🟡 Validar parámetros de ruta (`:id` debe ser int válido) ✅
 
 ### 2.3 Completar Ciclo de Vida de Reservas
-- [ ] 🔴 Agregar columna `reservation_expires_at` a la tabla `seats`
-- [ ] 🔴 Implementar worker background que libere reservas expiradas:
+- [x] 🔴 Agregar columna `reservation_expires_at` a la tabla `seats` ✅
+- [x] 🔴 Implementar worker background que libere reservas expiradas: ✅
   ```sql
   UPDATE seats SET status='available', user_id=NULL
   WHERE status='reserved' AND reservation_expires_at < NOW();
   ```
-- [ ] 🔴 Agregar endpoint `POST /api/reserve/:id/confirm` (reserved → sold)
-- [ ] 🔴 Agregar endpoint `POST /api/reserve/:id/cancel` (reserved → available)
-- [ ] 🟠 Agregar endpoint individual `GET /api/events/:id` (App3 lo necesita)
+- [x] 🔴 Agregar endpoint `POST /api/reserve/:id/confirm` (reserved → sold) ✅
+- [x] 🔴 Agregar endpoint `POST /api/reserve/:id/cancel` (reserved → available) ✅
+- [x] 🟠 Agregar endpoint individual `GET /api/events/:id` (App3 lo necesita) ✅
 
 ### 2.4 Read/Write Splitting en PostgreSQL
 - [ ] 🟡 Configurar dos pools de conexión en Go:
@@ -205,14 +205,14 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
 ## 3. 🎫 App2 — Motor de Facturación y Tickets (Flask + MariaDB)
 
 ### 3.1 Bugs Críticos del Frontend
-- [ ] 🔴 **`base.html` línea 22**: Cambiar `session.get('user_id')` por `session.get('user_rut')`. **La navbar NUNCA muestra el estado de login actual** — siempre muestra "Login" y "Register", nunca "My Tickets" ni "Logout"
-- [ ] 🔴 **`base.html`**: Agregar CSS de Bootstrap Icons (`bootstrap-icons@1.11.3`). Todos los iconos `<i class="bi ...">` están rotos y no se renderizan
-- [ ] 🟠 **`payment.html`**: Agregar atributos `name` a los inputs del formulario de pago (`cardName`, `cardNumber`, `expiry`, `cvv`)
+- [x] 🔴 **`base.html` línea 22**: Cambiar `session.get('user_id')` por `session.get('user_rut')`. **La navbar NUNCA muestra el estado de login actual** — siempre muestra "Login" y "Register", nunca "My Tickets" ni "Logout" ✅
+- [x] 🔴 **`base.html`**: Agregar CSS de Bootstrap Icons (`bootstrap-icons@1.11.3`). Todos los iconos `<i class="bi ...">` están rotos y no se renderizan ✅
+- [x] 🟠 **`payment.html`**: Agregar atributos `name` a los inputs del formulario de pago (`cardName`, `cardNumber`, `expiry`, `cvv`) ✅
 - [ ] 🟡 Unificar idioma: actualmente mezcla inglés ("Secure Payment Gateway") con español ("Pagar Ahora")
 
 ### 3.2 Seguridad del Backend
-- [ ] 🔴 **Implementar protección CSRF**: Ningún formulario POST tiene tokens CSRF. Usar `Flask-WTF`
-- [ ] 🔴 **`SECRET_KEY`**: Validar que `APP2_SECRET_KEY` no sea `None` al iniciar (fail fast)
+- [x] 🔴 **Implementar protección CSRF**: Ningún formulario POST tiene tokens CSRF. Usar `Flask-WTF` ✅
+- [x] 🔴 **`SECRET_KEY`**: Validar que `APP2_SECRET_KEY` no sea `None` al iniciar (fail fast) ✅
 - [ ] 🟠 Integrar `Flask-Login` con decorador `@login_required` centralizado (actualmente cada ruta chequea `g.user_rut is None` manualmente)
 - [ ] 🟠 Agregar validación de complejidad de contraseña
 - [ ] 🟡 Agregar rate limiting en endpoints de autenticación
@@ -222,13 +222,13 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
 - [ ] 🟠 **Cambiar `Float` por `Numeric(10, 2)`** en `price` (Ticket) y `amount` (Payment). `Float` causa errores de redondeo monetario por IEEE 754
 - [ ] 🟠 **RUT como `VARCHAR(12)`**: Actualmente es `INT`, lo que impide almacenar el dígito verificador 'K'. Implementar algoritmo Módulo 11 de validación
 - [ ] 🟠 Reemplazar `db.create_all()` en runtime por **Flask-Migrate (Alembic)** para control de versiones de esquema
-- [ ] 🟠 Configurar pool de SQLAlchemy: `pool_size=10`, `pool_recycle=3600`, `pool_pre_ping=True` (necesario para ProxySQL)
+- [x] 🟠 Configurar pool de SQLAlchemy: `pool_size=10`, `pool_recycle=3600`, `pool_pre_ping=True` (necesario para ProxySQL) ✅
 - [ ] 🟡 Agregar `unique=True` a `Payment.ticket_id` en el modelo SQLAlchemy (existe en SQL pero no en ORM)
 
 ### 3.4 Bugs del Backend
-- [ ] 🟠 **`notification_client.py` línea 16**: `str(os.times())` genera timestamps de CPU del proceso, NO timestamps reales. Cambiar a `datetime.now(timezone.utc).isoformat()`
-- [ ] 🟠 **`services.py` `AuthService.register`**: Al activar un placeholder, cambia el email sin verificar si ya existe en otro usuario → causa `IntegrityError` 500 no controlado
-- [ ] 🟡 Agregar `db.session.rollback()` explícito en bloques `try/except` de `services.py`
+- [x] 🟠 **`notification_client.py` línea 16**: `str(os.times())` genera timestamps de CPU del proceso, NO timestamps reales. Cambiar a `datetime.now(timezone.utc).isoformat()` ✅
+- [x] 🟠 **`services.py` `AuthService.register`**: Al activar un placeholder, cambia el email sin verificar si ya existe en otro usuario → causa `IntegrityError` 500 no controlado ✅
+- [x] 🟡 Agregar `db.session.rollback()` explícito en bloques `try/except` de `services.py` ✅
 - [ ] 🟡 Reemplazar `print()` por módulo `logging` con niveles y formato estructurado
 
 ### 3.5 Producción y DevOps App2
@@ -241,7 +241,7 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
 - [ ] 🟡 Agregar `autocomplete` a campos de formularios (`autocomplete="email"`, `autocomplete="current-password"`)
 - [ ] 🟡 Agregar campo de confirmación de contraseña en registro
 - [ ] 🟡 Agregar validación client-side del formato de RUT
-- [ ] 🟡 Corregir link de navbar brand (actualmente `href="#"`)
+- [x] 🟡 Corregir link de navbar brand (actualmente `href="#"`) ✅
 - [ ] 🟢 Rediseñar templates con un estilo visual más moderno y consistente
 
 ### 3.7 Problema Arquitectónico: Read-Your-Own-Writes
@@ -252,48 +252,48 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
 ## 4. 🛒 App3 — Portal de Venta de Entradas (Flask)
 
 ### 4.1 Backend
-- [ ] 🔴 **Eliminar `user_id: 123` hardcodeado** en `seats.html` línea 146. Implementar input de RUT o sesión
-- [ ] 🔴 **Compensación de transacciones**: Si el Middleware falla, NO retornar HTTP 200. Implementar rollback del asiento en App1
-- [ ] 🟠 Externalizar URLs hardcodeadas a variables de entorno (`APP1_API_URL`, `APP1_RESERVE_URL`, `MIDDLEWARE_URL`)
-- [ ] 🟠 Validar `request.get_json()` contra `None` (evitar `AttributeError: 'NoneType'`)
-- [ ] 🟡 Eliminar `pika` de `requirements.txt` (no se usa; App3 se comunica vía HTTP)
-- [ ] 🟡 Optimizar `ver_asientos`: actualmente hace GET a `/api/events` y itera todos para encontrar uno, luego hace otro GET. Usar endpoint individual `GET /api/events/:id`
+- [x] 🔴 **Eliminar `user_id: 123` hardcodeado** en `seats.html` línea 146. Implementar input de RUT o sesión ✅
+- [x] 🔴 **Compensación de transacciones**: Si el Middleware falla, NO retornar HTTP 200. Implementar rollback del asiento en App1 ✅
+- [x] 🟠 Externalizar URLs hardcodeadas a variables de entorno (`APP1_API_URL`, `APP1_RESERVE_URL`, `MIDDLEWARE_URL`) ✅
+- [x] 🟠 Validar `request.get_json()` contra `None` (evitar `AttributeError: 'NoneType'`) ✅
+- [x] 🟡 Eliminar `pika` de `requirements.txt` (no se usa; App3 se comunica vía HTTP) ✅
+- [x] 🟡 Optimizar `ver_asientos`: actualmente hace GET a `/api/events` y itera todos para encontrar uno, luego hace otro GET. Usar endpoint individual `GET /api/events/:id` ✅
 
 ### 4.2 Frontend
-- [ ] 🟡 Agregar modal de confirmación antes de reservar (mostrar precio, evento, asiento)
-- [ ] 🟡 Eliminar `<div id="global-message">` no utilizado y comentarios residuales en JS
+- [x] 🟡 Agregar modal de confirmación antes de reservar (mostrar precio, evento, asiento) ✅
+- [x] 🟡 Eliminar `<div id="global-message">` no utilizado y comentarios residuales en JS ✅
 - [ ] 🟢 Permitir selección de múltiples asientos antes de confirmar
 - [ ] 🟢 Mostrar precio y categoría/zona del asiento
 
 ### 4.3 Producción
 - [ ] 🟠 Reemplazar servidor de desarrollo Flask por **Gunicorn**
 - [ ] 🟡 Agregar health check en `docker-compose.yml` para App3
-- [ ] 🟡 Corregir dependencia en compose: App3 depende de `rabbitmq` pero debería depender de `nginx` y `middleware`
+- [x] 🟡 Corregir dependencia en compose: App3 depende de `rabbitmq` pero debería depender de `nginx` y `middleware` ✅
 
 ---
 
 ## 5. 🔀 Middleware — Bus de Mensajes (Go + Gin + RabbitMQ)
 
 ### 5.1 Bugs y Problemas Críticos
-- [ ] 🔴 **Connection Thrashing**: Cada petición HTTP abre y cierra una conexión AMQP completa (TCP handshake + auth + channel). Implementar **singleton de conexión persistente** con pool de canales reutilizables
-- [ ] 🔴 **Implementar listener TCP en puerto 7002** para recibir notificaciones de retorno de App2 (`TICKET_PAID`, `TICKET_REFUNDED`)
-- [ ] 🟠 Implementar `Graceful Shutdown` con `os.Signal` + `context.Context`
-- [ ] 🟡 Corregir `go.sum` vacío en el repositorio (0 bytes)
+- [x] 🔴 **Connection Thrashing**: Cada petición HTTP abre y cierra una conexión AMQP completa (TCP handshake + auth + channel). Implementar **singleton de conexión persistente** con pool de canales reutilizables ✅
+- [x] 🔴 **Implementar listener TCP en puerto 7002** para recibir notificaciones de retorno de App2 (`TICKET_PAID`, `TICKET_REFUNDED`) ✅
+- [x] 🟠 Implementar `Graceful Shutdown` con `os.Signal` + `context.Context` ✅
+- [x] 🟡 Corregir `go.sum` vacío en el repositorio (0 bytes) ✅
 
 ### 5.2 Mejoras para Portafolio
-- [ ] 🟠 Agregar endpoint `GET /health` con verificación de conexión a RabbitMQ
+- [x] 🟠 Agregar endpoint `GET /health` con verificación de conexión a RabbitMQ ✅
 - [ ] 🟡 Agregar métricas Prometheus (`/metrics`)
 - [ ] 🟡 Usar logging estructurado (`zerolog` o `zap`)
-- [ ] 🟡 Agregar retry con backoff exponencial para conexión a RabbitMQ al arranque
+- [x] 🟡 Agregar retry con backoff exponencial para conexión a RabbitMQ al arranque ✅
 
 ---
 
 ## 6. 🐳 Docker Compose y Orquestación
 
 ### 6.1 Correcciones
-- [ ] 🔴 Conectar servicios a las redes correctas (ver sección 1.1)
+- [x] 🔴 Conectar servicios a las redes correctas (ver sección 1.1) ✅
 - [ ] 🟠 Agregar health checks para `middleware` y `app3`
-- [ ] 🟠 Corregir dependencias de `app3`: cambiar `depends_on: rabbitmq` por `depends_on: [nginx, middleware]`
+- [x] 🟠 Corregir dependencias de `app3`: cambiar `depends_on: rabbitmq` por `depends_on: [nginx, middleware]` ✅
 - [ ] 🟡 Eliminar volumen de desarrollo `./app2:/usr/src/app` (sobreescribe contenido del contenedor)
 
 ### 6.2 Mejoras
@@ -315,11 +315,11 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
 - [ ] 🟡 Agregar sección de tecnologías utilizadas con badges
 
 ### 7.2 `.env.example`
-- [ ] 🟠 Agregar variables faltantes:
+- [x] 🟠 Agregar variables faltantes: ✅
   - App1: credenciales PostgreSQL, puertos
   - App3: `APP3_PORT`, `APP1_API_URL`, `MIDDLEWARE_URL`
   - Middleware: `RABBITMQ_URL`, `LISTEN_PORT`
-- [ ] 🟡 Agregar comentarios explicativos a cada variable
+- [x] 🟡 Agregar comentarios explicativos a cada variable ✅
 
 ### 7.3 `.gitignore`
 - [x] 🟡 ~~Agregar patrones faltantes~~ ✅ (Python, Go, IDE, OS, Docker patterns agregados)
