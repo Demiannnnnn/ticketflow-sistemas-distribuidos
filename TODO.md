@@ -194,7 +194,7 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
 - [ ] 🟢 Permitir selección múltiple de asientos
 
 ### 2.6 Infraestructura App1
-- [ ] 🟡 Eliminar bloque `listen mariadb` muerto en `haproxy.cfg` (residuo de pruebas)
+- [x] 🟡 ~~Eliminar bloque `listen mariadb` muerto en `haproxy.cfg` (residuo de pruebas)~~ ✅
 - [ ] 🟡 Agregar `USER 10001:10001` (non-root) en el Dockerfile de runtime
 - [ ] 🟡 Descomentar/crear directorio `static/` o eliminar `router.Static("/static", "./static")` muerto en `main.go`
 - [ ] 🟡 Fix `entrypoint.sh`: usar `hostname -I | awk '{print $1}'` en vez de `hostname -i` (falla con múltiples IPs)
@@ -235,7 +235,7 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
 - [ ] 🟠 Reemplazar `flask run` por **Gunicorn**: `gunicorn -w 4 -b 0.0.0.0:5002 run:app`
 - [ ] 🟠 Separar web server (Gunicorn) del consumer de mensajes en contenedores distintos
 - [ ] 🟡 Resolver race condition de `replicas: 2`: ambas réplicas levantan `TCPServerAdapter` en puerto 6002 independientemente, sin coordinación de mensajes
-- [ ] 🟡 Eliminar archivos `__pycache__/` del repositorio y agregar al `.gitignore`
+- [x] 🟡 ~~Eliminar archivos `__pycache__/` del repositorio y agregar al `.gitignore`~~ ✅
 
 ### 3.6 UX del Frontend App2
 - [ ] 🟡 Agregar `autocomplete` a campos de formularios (`autocomplete="email"`, `autocomplete="current-password"`)
@@ -322,36 +322,9 @@ Estas son las fallas fundamentales que impiden que el sistema funcione como un t
 - [ ] 🟡 Agregar comentarios explicativos a cada variable
 
 ### 7.3 `.gitignore`
-- [ ] 🟡 Agregar patrones faltantes:
-  ```gitignore
-  # Python
-  **/__pycache__/
-  *.pyc
-  *.pyo
-  .venv/
-  env/
-  
-  # Go
-  middleware/middleware
-  app1/backend/main
-  
-  # IDE
-  .vscode/
-  .idea/
-  
-  # OS
-  .DS_Store
-  Thumbs.db
-  
-  # Docker
-  docker-compose.override.yml
-  
-  # Env
-  .env
-  .env.local
-  ```
-- [ ] 🟡 Eliminar `.DS_Store` commiteado: `git rm --cached .DS_Store`
-- [ ] 🟡 Eliminar archivos `__pycache__/*.pyc` commiteados: `git rm -r --cached app2/__pycache__/ app2/app/__pycache__/`
+- [x] 🟡 ~~Agregar patrones faltantes~~ ✅ (Python, Go, IDE, OS, Docker patterns agregados)
+- [x] 🟡 ~~Eliminar `.DS_Store` commiteado: `git rm --cached .DS_Store`~~ ✅
+- [x] 🟡 ~~Eliminar archivos `__pycache__/*.pyc` commiteados~~ ✅
 
 ### 7.4 Diagramas
 - [ ] 🟡 Crear diagrama de arquitectura C4 global del sistema (contexto + contenedores)
