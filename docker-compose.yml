@@ -13,15 +13,18 @@ services:
     env_file:
       - .env
     environment:
-      - MIDDLEWARE_TYPE=tcp_server
+      - MIDDLEWARE_TYPE=${MIDDLEWARE_TYPE:-rabbitmq}
+      - RABBITMQ_HOST=rabbitmq
       - APP2_DB_HOST=app2_proxysql
       - APP2_DB_PORT=6033
-      - MIDDLEWARE_NOTIFY_HOST=172.18.0.1
+      - MIDDLEWARE_NOTIFY_HOST=middleware
+      - MIDDLEWARE_NOTIFY_PORT=7002
     depends_on:
       app2_proxysql:
         condition: service_healthy
     networks:
       - app2_network
+      - ticketflow_network
 
   app2_nginx:
     image: nginx:1.25.4
@@ -34,6 +37,7 @@ services:
       - app2
     networks:
       - app2_network
+      - ticketflow_network
 
   # --- Capa de Enrutamiento y HA ---
   app2_proxysql:
@@ -291,9 +295,12 @@ services:
     ports:
       - "5003:5000"
     environment:
-      - RABBITMQ_HOST=rabbitmq
+      - APP1_API_URL=http://nginx/api/events
+      - APP1_RESERVE_URL=http://nginx/api/reserve
+      - MIDDLEWARE_URL=http://middleware:8000/order
     depends_on:
-      - rabbitmq
+      - nginx
+      - middleware
     networks:
       - ticketflow_network
 
@@ -302,12 +309,16 @@ services:
     container_name: ticketflow_middleware
     ports:
       - "8000:8000"
+      - "7002:7002"
     environment:
       - RABBITMQ_HOST=rabbitmq
+      - PORT=8000
+      - NOTIFY_PORT=7002
     depends_on:
       - rabbitmq
     networks:
       - ticketflow_network
+      - app2_network
 
 volumes:
   app2_db1_data:
