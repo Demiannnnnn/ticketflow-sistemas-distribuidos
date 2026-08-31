@@ -9,6 +9,7 @@
             <div class="card-header">Register</div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('auth.register') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="mb-3">
                         <label for="rut" class="form-label">RUT (without verification digit or dots)</label>
                         <input type="number" class="form-control" id="rut" name="rut" placeholder="12345678" required>

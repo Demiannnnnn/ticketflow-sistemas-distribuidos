@@ -1,11 +1,15 @@
 from flask import Flask
+from flask_wtf.csrf import CSRFProtect
 from .config import Config
 from .models import db
+
+csrf = CSRFProtect()
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    csrf.init_app(app)
     db.init_app(app)
 
     from .routes import auth_bp, ticket_bp

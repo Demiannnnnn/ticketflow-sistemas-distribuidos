@@ -16,24 +16,25 @@
                 <h3 class="text-center mb-4">${{ ticket.price }}</h3>
 
                 <form action="{{ url_for('ticket.pay_ticket', ticket_id=ticket.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="mb-3">
                         <label for="cardName" class="form-label">Nombre en la Tarjeta</label>
-                        <input type="text" class="form-control" id="cardName" placeholder="Juan Pérez" required>
+                        <input type="text" class="form-control" id="cardName" name="cardName" placeholder="Juan Pérez" required>
                     </div>
                     
                     <div class="mb-3">
                         <label for="cardNumber" class="form-label">Número de Tarjeta</label>
-                        <input type="text" class="form-control" id="cardNumber" placeholder="0000 0000 0000 0000" required>
+                        <input type="text" class="form-control" id="cardNumber" name="cardNumber" placeholder="0000 0000 0000 0000" required>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="expiry" class="form-label">Expiración (MM/YY)</label>
-                            <input type="text" class="form-control" id="expiry" placeholder="12/25" required>
+                            <input type="text" class="form-control" id="expiry" name="expiry" placeholder="12/25" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="cvv" class="form-label">CVV</label>
-                            <input type="text" class="form-control" id="cvv" placeholder="123" required>
+                            <input type="text" class="form-control" id="cvv" name="cvv" placeholder="123" required>
                         </div>
                     </div>
 
