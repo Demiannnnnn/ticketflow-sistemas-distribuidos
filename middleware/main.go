@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -77,8 +78,12 @@ func (o *OrderRequest) UnmarshalJSON(data []byte) error {
 		case float64:
 			o.UserRUT = int(v)
 		case string:
+			str := v
+			if idx := strings.Index(str, "-"); idx != -1 {
+				str = str[:idx]
+			}
 			clean := ""
-			for _, r := range v {
+			for _, r := range str {
 				if r >= '0' && r <= '9' {
 					clean += string(r)
 				}
