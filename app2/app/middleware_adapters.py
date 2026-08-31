@@ -70,10 +70,58 @@ class TCPServerAdapter(MiddlewareAdapter):
                                 callback(line.encode('utf-8'))
 
 
-def get_middleware_adapter():
-    mw_type = os.environ.get('MIDDLEWARE_TYPE', 'tcp_server').lower()
+class RabbitMQAdapter(MiddlewareAdapter):
+    def __init__(self, host=None, port=None, queue_name='orden_creada', user=None, password=None):
+        self.host = host or os.environ.get('RABBITMQ_HOST', 'rabbitmq')
+        self.port = int(port or os.environ.get('RABBITMQ_PORT', 5672))
+        self.queue_name = queue_name
+        self.user = user or os.environ.get('RABBITMQ_USER', 'guest')
+        self.password = password or os.environ.get('RABBITMQ_PASSWORD', 'guest')
 
-    if mw_type == 'tcp_socket':
+    def listen(self, callback):
+        print(f"Connecting to RabbitMQ at {self.host}:{self.port}, queue: {self.queue_name}...")
+        while True:
+            try:
+                import pika
+                credentials = pika.PlainCredentials(self.user, self.password)
+                parameters = pika.ConnectionParameters(
+                    host=self.host,
+                    port=self.port,
+                    credentials=credentials,
+                    heartbeat=600,
+                    blocked_connection_timeout=300
+                )
+                connection = pika.BlockingConnection(parameters)
+                channel = connection.channel()
+
+                channel.queue_declare(queue=self.queue_name, durable=True)
+                channel.basic_qos(prefetch_count=1)
+
+                print(f" [*] Waiting for orders on RabbitMQ queue '{self.queue_name}'...")
+
+                def on_message(ch, method, properties, body):
+                    try:
+                        callback(body)
+                        ch.basic_ack(delivery_tag=method.delivery_tag)
+                    except Exception as e:
+                        print(f"Error handling RabbitMQ message: {e}")
+                        ch.basic_ack(delivery_tag=method.delivery_tag)
+
+                channel.basic_consume(queue=self.queue_name, on_message_callback=on_message)
+                channel.start_consuming()
+
+            except Exception as e:
+                print(f"RabbitMQ connection/consumer error: {e}, retrying in 5s...")
+                time.sleep(5)
+
+
+def get_middleware_adapter():
+    mw_type = os.environ.get('MIDDLEWARE_TYPE', 'rabbitmq').lower()
+
+    if mw_type == 'rabbitmq':
+        return RabbitMQAdapter()
+
+    elif mw_type == 'tcp_socket':
         host = os.environ.get('MIDDLEWARE_HOST', 'middleware')
         port = os.environ.get('MIDDLEWARE_PORT', '9000')
         return TCPSocketAdapter(host, port)

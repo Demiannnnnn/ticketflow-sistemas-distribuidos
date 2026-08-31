@@ -55,38 +55,70 @@ class AuthService:
 class TicketService:
     @staticmethod
     def receive_external_ticket(json_data):
-        # Datos esperados: id, price, event, rut (obligatorio ahora)
-        external_id = json_data.get('id')
-        price = json_data.get('price')
-        event_name = json_data.get('event', 'Unknown Event')
-        user_rut = json_data.get('rut')
-        
-        if not user_rut:
-            print("Error: Ticket received without RUT")
+        # Acepta esquema estandarizado (order_id, event_name, seat_number, user_rut, price)
+        # y retrocompatibilidad con esquemas previos (id, event, rut)
+        external_id = json_data.get('order_id') or json_data.get('id')
+        if not external_id:
+            import uuid
+            external_id = str(uuid.uuid4())
+
+        price_raw = json_data.get('price', 5000.0)
+        try:
+            price = float(price_raw)
+        except (ValueError, TypeError):
+            price = 5000.0
+
+        event_name = json_data.get('event_name') or json_data.get('event', 'Evento Sin Nombre')
+        seat_number = json_data.get('seat_number')
+        if seat_number and f"Asiento {seat_number}" not in event_name:
+            event_name = f"{event_name} (Asiento {seat_number})"
+
+        raw_rut = json_data.get('user_rut') or json_data.get('rut') or json_data.get('user_id')
+        if not raw_rut:
+            print("Error: Ticket received without RUT or User ID")
             return None
-        
-        user = User.query.filter_by(rut=user_rut).first()
-        if not user:
-            # Crear usuario Placeholder (sin email/password) para vincular el ticket
-            # Cuando el usuario real se registre con este RUT, tomará posesión de estos tickets.
-            user = User(rut=user_rut, full_name="Usuario Pendiente")
-            db.session.add(user)
+
+        try:
+            if isinstance(raw_rut, str):
+                digits = ''.join(filter(str.isdigit, raw_rut))
+                user_rut = int(digits) if digits else None
+            else:
+                user_rut = int(raw_rut)
+        except (ValueError, TypeError):
+            print(f"Error: Invalid RUT format: {raw_rut}")
+            return None
+
+        if not user_rut:
+            print("Error: Empty RUT parsed")
+            return None
+
+        try:
+            user = User.query.filter_by(rut=user_rut).first()
+            if not user:
+                # Crear usuario Placeholder para vincular el ticket pendiente
+                user = User(rut=user_rut, full_name="Usuario Pendiente")
+                db.session.add(user)
+                db.session.commit()
+
+            existing_ticket = Ticket.query.filter_by(external_id=external_id).first()
+            if existing_ticket:
+                return existing_ticket
+
+            new_ticket = Ticket(
+                external_id=external_id,
+                price=price,
+                event_name=event_name,
+                user_rut=user.rut,
+                status=TicketStatus.PENDING_PAYMENT
+            )
+            db.session.add(new_ticket)
             db.session.commit()
-        
-        existing_ticket = Ticket.query.filter_by(external_id=external_id).first()
-        if existing_ticket:
-            return existing_ticket
-            
-        new_ticket = Ticket(
-            external_id=external_id,
-            price=float(price),
-            event_name=event_name,
-            user_rut=user.rut,
-            status=TicketStatus.PENDING_PAYMENT
-        )
-        db.session.add(new_ticket)
-        db.session.commit()
-        return new_ticket
+            print(f" [✓] Ticket successfully created for RUT {user.rut}: {external_id} - {event_name}")
+            return new_ticket
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error saving external ticket: {e}")
+            return None
 
     @staticmethod
     def process_payment(user_rut, ticket_id, payment_token="dummy_token"):
