@@ -26,7 +26,12 @@ class AuthService:
 
     @staticmethod
     def register(rut, email, full_name, password):
-        # Verificar si existe por RUT primero
+        # 1. Verificar si el email ya está en uso por otro usuario
+        user_with_email = User.query.filter_by(email=email).first()
+        if user_with_email and user_with_email.rut != rut:
+            return None
+
+        # 2. Verificar si existe por RUT
         existing_user = User.query.filter_by(rut=rut).first()
         
         if existing_user:
@@ -34,23 +39,26 @@ class AuthService:
                 # Ya está registrado completamente
                 return None
             else:
-                # Es un usuario Placeholder (creado por un ticket previo)
-                # Actualizamos sus datos para "activar" la cuenta
+                # Es un usuario Placeholder (creado al recibir una orden previa)
                 existing_user.email = email
                 existing_user.full_name = full_name
                 existing_user.set_password(password)
-                db.session.commit()
-                return existing_user
+                try:
+                    db.session.commit()
+                    return existing_user
+                except Exception:
+                    db.session.rollback()
+                    return None
         
-        # Verificar si el email ya está en uso por OTRO usuario (aunque el RUT sea nuevo)
-        if User.query.filter_by(email=email).first():
+        try:
+            new_user = User(rut=rut, email=email, full_name=full_name)
+            new_user.set_password(password)
+            db.session.add(new_user)
+            db.session.commit()
+            return new_user
+        except Exception:
+            db.session.rollback()
             return None
-        
-        new_user = User(rut=rut, email=email, full_name=full_name)
-        new_user.set_password(password)
-        db.session.add(new_user)
-        db.session.commit()
-        return new_user
 
 class TicketService:
     @staticmethod

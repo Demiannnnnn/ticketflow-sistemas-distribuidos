@@ -21,6 +21,7 @@
                 <p class="small text-muted">Simulación de validación en puerta:</p>
                 
                 <form action="{{ url_for('ticket.use_ticket', ticket_id=ticket.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="bi bi-qr-code-scan"></i> Simular Escaneo (Usar Ticket)
                     </button>
