@@ -97,7 +97,8 @@ def reservar_asiento():
     # Limpiar y validar RUT a formato numérico
     try:
         if isinstance(raw_rut, str):
-            digits = ''.join(filter(str.isdigit, raw_rut))
+            rut_str = raw_rut.split('-')[0] if '-' in raw_rut else raw_rut
+            digits = ''.join(filter(str.isdigit, rut_str))
             user_rut = int(digits) if digits else None
         else:
             user_rut = int(raw_rut)
