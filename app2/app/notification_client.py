@@ -1,6 +1,7 @@
 import socket
 import json
 import os
+from datetime import datetime, timezone
 from threading import Thread
 
 class NotificationClient:
@@ -13,7 +14,7 @@ class NotificationClient:
         payload = {
             "type": event_type,
             "data": ticket_data,
-            "timestamp": str(os.times()) # Simple timestamp
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
         # Ejecutar en un hilo separado para no bloquear
@@ -22,7 +23,7 @@ class NotificationClient:
 
     @staticmethod
     def _send_internal(payload):
-        host = os.environ.get('MIDDLEWARE_NOTIFY_HOST', '172.17.0.1')
+        host = os.environ.get('MIDDLEWARE_NOTIFY_HOST', 'middleware')
         port = int(os.environ.get('MIDDLEWARE_NOTIFY_PORT', 7002))
         
         print(f" [->] Sending notification to Middleware at {host}:{port}...")
