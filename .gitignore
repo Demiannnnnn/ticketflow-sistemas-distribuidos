@@ -1,3 +1,69 @@
-./app2/__pycache__/
+# ========================
+# Python
+# ========================
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+venv/
+.eggs/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+htmlcov/
+.coverage
+*.cover
+
+# ========================
+# Go
+# ========================
+# Compiled binaries
+middleware/middleware
+app1/backend/main
+*.exe
+*.exe~
+*.dll
+*.dylib
+*.test
+*.out
+
+# ========================
+# Environment & Secrets
+# ========================
 .env
-*.pyc
+.env.local
+.env.*.local
+
+# ========================
+# IDE & Editors
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ========================
+# OS Files
+# ========================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ========================
+# Docker
+# ========================
+docker-compose.override.yml
+
+# ========================
+# Logs & Temp
+# ========================
+*.log
+tmp/
