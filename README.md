@@ -180,6 +180,27 @@ El sistema consume mensajes de la cola `new_ticket` en RabbitMQ.
 - **Tecnología**: Go + RabbitMQ
 - **Funcionalidad**: Comunicación entre App1, App2 y App3
 
+## ✅ Tests unitarios y CI
+
+```bash
+# App1 y Middleware (Go)
+cd app1/backend && go test ./...
+cd middleware && go test ./...
+
+# App2 y App3 (Python; cada una con su propio entorno virtual)
+cd app2 && pip install -r requirements.txt pytest && python -m pytest
+cd app3 && pip install -r requirements.txt pytest && python -m pytest
+```
+
+- **App1**: handlers HTTP con `go-sqlmock` (reserva de asientos, conflicto/doble reserva, errores de BD, health).
+- **Middleware**: validación de `POST /order` con un publicador simulado (sin RabbitMQ).
+- **App2**: servicios, rutas Flask y adaptadores TCP contra SQLite en memoria.
+- **App3**: rutas del portal con `requests` simulado.
+
+El workflow `.github/workflows/ci.yml` corre vet/build/tests de Go, pytest de App2/App3,
+valida `docker-compose.yml` y construye las imágenes de las 4 aplicaciones en cada push y PR.
+No hay despliegue automático.
+
 ## 🧪 Pruebas de Tolerancia a Fallos
 
 ### 1. Caída de Réplica de App1
