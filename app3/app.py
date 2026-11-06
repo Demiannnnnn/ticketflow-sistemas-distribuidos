@@ -78,7 +78,11 @@ def reservar_asiento():
 
         if response_app1.status_code != 200:
             # Si App1 falla la reserva (ej: asiento ocupado), retornar el error.
-            error_details = response_app1.json().get('error', 'Error desconocido en App1')
+            # El cuerpo puede no ser JSON (p. ej. un 502 HTML de nginx sin réplicas disponibles)
+            try:
+                error_details = response_app1.json().get('error', 'Error desconocido en App1')
+            except ValueError:
+                error_details = 'Error desconocido en App1'
             return jsonify({'error': f"App1 no pudo reservar el asiento: {error_details}"}), response_app1.status_code
 
     except requests.exceptions.RequestException as e:
