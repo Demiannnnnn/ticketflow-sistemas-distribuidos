@@ -35,6 +35,9 @@ class AuthService:
                 return None
             else:
                 # Es un usuario Placeholder (creado por un ticket previo)
+                # Si el email ya pertenece a otro usuario, rechazar (evita IntegrityError por email UNIQUE)
+                if User.query.filter(User.email == email, User.rut != rut).first():
+                    return None
                 # Actualizamos sus datos para "activar" la cuenta
                 existing_user.email = email
                 existing_user.full_name = full_name
