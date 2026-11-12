@@ -20,7 +20,11 @@ type OrderRequest struct {
 	Quantity int    `json:"quantity" binding:"required"`
 }
 
-func main() {
+// Publisher publica una orden en la cola de procesamiento
+type Publisher func(OrderRequest) error
+
+// setupRouter arma las rutas HTTP; recibe el publicador para poder sustituirlo en tests
+func setupRouter(publish Publisher) *gin.Engine {
 	router := gin.Default()
 
 	// Endpoint para recibir órdenes de compra desde App3
@@ -32,7 +36,7 @@ func main() {
 		}
 
 		// Publicar la orden en RabbitMQ
-		err := publishToRabbitMQ(req)
+		err := publish(req)
 		if err != nil {
 			log.Printf("Error publicando orden en RabbitMQ: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno al procesar la orden"})
@@ -41,6 +45,12 @@ func main() {
 
 		c.JSON(http.StatusOK, gin.H{"message": "Orden recibida y enviada a la cola de procesamiento", "order": req})
 	})
+
+	return router
+}
+
+func main() {
+	router := setupRouter(publishToRabbitMQ)
 
 	port := os.Getenv("PORT")
 	if port == "" {
