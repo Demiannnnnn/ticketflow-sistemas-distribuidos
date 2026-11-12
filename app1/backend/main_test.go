@@ -175,6 +175,27 @@ func TestGetEventsIncluyeAsientosDisponibles(t *testing.T) {
 	}
 }
 
+func TestGetEventsDescriptionNULL(t *testing.T) {
+	r, mock := setup(t)
+	rows := sqlmock.NewRows([]string{"id", "name", "venue", "date", "total_seats", "description", "available_seats"}).
+		AddRow(1, "Concierto", "Estadio", "2025-12-15 20:00", 50, nil, 48)
+	mock.ExpectQuery(`SELECT e.id, e.name`).WillReturnRows(rows)
+
+	w, body := do(r, http.MethodGet, "/api/events", "")
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+	events := body["events"].([]any)
+	if len(events) != 1 {
+		t.Fatalf("se esperaba 1 evento, hay %d", len(events))
+	}
+	first := events[0].(map[string]any)
+	if first["description"] != "" {
+		t.Fatalf("description esperada \"\", obtenida: %v", first["description"])
+	}
+}
+
 func TestGetEventsErrorDeBDDevuelve500(t *testing.T) {
 	r, mock := setup(t)
 	mock.ExpectQuery(`SELECT e.id, e.name`).WillReturnError(errors.New("db caída"))

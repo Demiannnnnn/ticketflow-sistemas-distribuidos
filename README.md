@@ -1,6 +1,8 @@
 # Proyecto 3 - Sistemas Distribuidos
 ## TicketFlow - Sistema de Venta de Tickets con Tolerancia a Fallos
 
+[![CI](https://github.com/Demiannnnnn/ticketflow-sistemas-distribuidos/actions/workflows/ci.yml/badge.svg?branch=tests/unitarios-y-ci)](https://github.com/Demiannnnnn/ticketflow-sistemas-distribuidos/actions/workflows/ci.yml)
+
 Universidad de Talca - Noviembre 2025
 
 **Integrantes:**
@@ -183,13 +185,17 @@ El sistema consume mensajes de la cola `new_ticket` en RabbitMQ.
 ## ✅ Tests unitarios y CI
 
 ```bash
-# App1 y Middleware (Go)
-cd app1/backend && go test ./...
-cd middleware && go test ./...
+# App1 (Go)
+cd app1/backend && go test -race -count=1 ./...
 
-# App2 y App3 (Python; cada una con su propio entorno virtual)
-cd app2 && pip install -r requirements.txt pytest && python -m pytest
-cd app3 && pip install -r requirements.txt pytest && python -m pytest
+# Middleware (Go)
+cd middleware && go vet ./... && go test -race -count=1 ./...
+
+# App2 (Python; instalar dependencias: pip install -r requirements.txt pytest)
+cd app2 && python -m pytest -q
+
+# App3 (Python; instalar dependencias: pip install -r requirements.txt pytest)
+cd app3 && python -m pytest -q
 ```
 
 - **App1**: handlers HTTP con `go-sqlmock` (reserva de asientos, conflicto/doble reserva, errores de BD, health).
@@ -243,12 +249,11 @@ done
 # El resto recibe error 409 (Conflict)
 ```
 
-### 4. Prueba de Middleware con RabbitMQ
+### 4. Prueba de Middleware con TCP
 
 ```bash
-# Simular envío de tickets desde Middleware
-pip install pika
-python3 simulate_middleware.py
+# Simular envío de tickets hacia App2 mediante TCP
+python3 simulate_tcp_middleware.py
 
 # Verificar en App2 que los tickets fueron recibidos
 curl http://localhost:5002/api/tickets
@@ -407,47 +412,51 @@ docker exec ticketflow_rabbitmq rabbitmqctl list_connections
 ## 📁 Estructura del Proyecto
 
 ```
-Proy3_SD/
-├── app1/                       # App1 - Gestor de Reservas (Go)
+ticketflow-sistemas-distribuidos/
+├── app1/                       # App1 - Gestor de Reservas (Go + Gin)
 │   ├── backend/
 │   │   ├── main.go            # Código principal Go
+│   │   ├── main_test.go       # Tests unitarios
 │   │   ├── go.mod             # Dependencias
 │   │   └── go.sum             # Checksums
+│   ├── db/                    # Imagen y configuración Patroni
 │   ├── frontend/
 │   │   └── index.html         # Frontend web
 │   ├── Dockerfile             # Build de App1
-│   ├── nginx.conf             # Config Load Balancer
-│   ├── haproxy.cfg            # Config PostgreSQL LB
-│   └── docker-compose.yml     # Compose específico App1
-├── app2/                       # App2 - Facturación (Python)
+│   ├── nginx.conf             # Config Load Balancer App1
+│   └── haproxy.cfg            # Config PostgreSQL LB
+├── app2/                       # App2 - Facturación (Python + Flask)
 │   ├── app/
 │   │   ├── models.py          # Modelos de Datos
 │   │   ├── services.py        # Lógica de Negocio
 │   │   ├── routes.py          # Controladores Web
-│   │   └── socket_listener.py # Consumidor RabbitMQ
+│   │   └── socket_listener.py # Listener de sockets/middleware
+│   ├── tests/                 # Tests unitarios pytest
 │   ├── run.py                 # Entrypoint Web
 │   ├── run_listener.py        # Entrypoint Listener
 │   └── Dockerfile
-├── app3/                       # App3 - Portal de Venta
+├── app2_mariadb/               # Configuración e inicialización MariaDB
+├── app2_nginx_lb/              # Nginx LB para App2
+├── app2_orchestrator/          # Orchestrator para alta disponibilidad MariaDB
+├── app2_proxysql/              # ProxySQL para MariaDB
+├── app2_scripts/               # Scripts de replicación MariaDB
+├── app3/                       # App3 - Portal de Venta (Python + Flask)
 │   ├── app.py
 │   ├── templates/
 │   │   ├── index.html
 │   │   └── seats.html
+│   ├── tests/                 # Tests unitarios pytest
 │   └── Dockerfile
-├── middleware/                 # Middleware - Orquestador (Go)
+├── middleware/                 # Middleware - Orquestador (Go + Gin + RabbitMQ)
 │   ├── main.go
+│   ├── main_test.go
 │   ├── go.mod
 │   └── Dockerfile
-├── mariadb/                    # Configuración MariaDB
-│   ├── Dockerfile
-│   └── init.sql
 ├── diagramas/                  # Diagramas del sistema
-│   └── app2/                   # Diagramas específicos App2
 ├── docker-compose.yml          # Orquestación completa
+├── simulate_tcp_middleware.py  # Simulación de middleware TCP
 ├── .env.example                # Ejemplo de variables de entorno
-├── README.md                   # Esta documentación
-├── Proyecto3.pdf              # Enunciado
-└── Informe de contexto.pdf    # Contexto del proyecto
+└── README.md                   # Esta documentación
 ```
 
 ## 🐛 Troubleshooting
