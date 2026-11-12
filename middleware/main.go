@@ -17,7 +17,7 @@ import (
 type OrderRequest struct {
 	EventID  string `json:"event_id" binding:"required"`
 	UserID   string `json:"user_id" binding:"required"`
-	Quantity int    `json:"quantity" binding:"required"`
+	Quantity int    `json:"quantity" binding:"required,gt=0"`
 }
 
 // Publisher publica una orden en la cola de procesamiento
