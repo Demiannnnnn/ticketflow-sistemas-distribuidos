@@ -5,7 +5,6 @@ import time
 # Config
 BASE_URL = "http://localhost:5002"
 EMAIL = "api_test@example.com"
-USERNAME = "apitestuser"
 PASSWORD = "securepassword"
 
 def log(msg):
