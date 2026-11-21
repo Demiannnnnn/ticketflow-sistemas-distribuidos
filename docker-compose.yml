@@ -41,6 +41,8 @@ services:
       - ./app2_proxysql/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     environment:
+      - APP2_PROXY_ADMIN_USER=${APP2_PROXY_ADMIN_USER:-admin}
+      - APP2_PROXY_ADMIN_PASSWORD=${APP2_PROXY_ADMIN_PASSWORD}
       - APP2_MONITOR_USER=${APP2_MONITOR_USER:-monitor_user}
       - APP2_MONITOR_PASSWORD=${APP2_MONITOR_PASSWORD}
       - APP2_DB_USER=${APP2_DB_USER:-user}
@@ -50,7 +52,7 @@ services:
       - "6032:6032"
       - "6033:6033"
     healthcheck:
-      test: ["CMD", "mysql", "-h127.0.0.1", "-P6032", "-uadmin", "-padmin", "-e", "SELECT 1"]
+      test: ["CMD", "mysql", "-h127.0.0.1", "-P6032", "-u${APP2_PROXY_ADMIN_USER:-admin}", "-p${APP2_PROXY_ADMIN_PASSWORD}", "-e", "SELECT 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -66,6 +68,8 @@ services:
     environment:
       - APP2_ORCH_USER=${APP2_ORCH_USER:-orch_user}
       - APP2_ORCH_PASSWORD=${APP2_ORCH_PASSWORD}
+      - APP2_PROXY_ADMIN_USER=${APP2_PROXY_ADMIN_USER:-admin}
+      - APP2_PROXY_ADMIN_PASSWORD=${APP2_PROXY_ADMIN_PASSWORD}
     ports:
       - "3000:3000"
     volumes:

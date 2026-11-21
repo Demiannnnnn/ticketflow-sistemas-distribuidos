@@ -6,6 +6,8 @@ TEMPLATE_FILE="/etc/proxysql.cnf.template"
 
 if [ -f "$TEMPLATE_FILE" ]; then
     sed \
+      -e "s|\${APP2_PROXY_ADMIN_USER}|${APP2_PROXY_ADMIN_USER:-admin}|g" \
+      -e "s|\${APP2_PROXY_ADMIN_PASSWORD}|${APP2_PROXY_ADMIN_PASSWORD}|g" \
       -e "s|\${APP2_MONITOR_USER}|${APP2_MONITOR_USER:-monitor_user}|g" \
       -e "s|\${APP2_MONITOR_PASSWORD}|${APP2_MONITOR_PASSWORD}|g" \
       -e "s|\${APP2_DB_USER}|${APP2_DB_USER:-user}|g" \
