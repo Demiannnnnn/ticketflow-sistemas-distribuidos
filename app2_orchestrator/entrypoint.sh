@@ -11,4 +11,8 @@ if [ -f "$TEMPLATE_FILE" ]; then
       "$TEMPLATE_FILE" > "$CONFIG_FILE"
 fi
 
+if [ $# -gt 0 ]; then
+    exec "$@"
+fi
+
 exec /usr/local/orchestrator/orchestrator --config="$CONFIG_FILE" http
