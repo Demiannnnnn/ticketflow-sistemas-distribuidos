@@ -26,7 +26,7 @@ services:
     volumes:
       - ./app2_nginx_lb/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "${APP2_RUN_PORT}:80"
+      - "${APP2_RUN_PORT:-5002}:80"
       - "${APP2_SOCKET_PORT:-6002}:6002"
     depends_on:
       - app2
@@ -37,12 +37,22 @@ services:
   app2_proxysql:
     image: proxysql/proxysql:2.5.4
     volumes:
-      - ./app2_proxysql/conf/proxysql.cnf:/etc/proxysql.cnf
+      - ./app2_proxysql/conf/proxysql.cnf:/etc/proxysql.cnf.template:ro
+      - ./app2_proxysql/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    environment:
+      - APP2_PROXY_ADMIN_USER=${APP2_PROXY_ADMIN_USER:-admin}
+      - APP2_PROXY_ADMIN_PASSWORD=${APP2_PROXY_ADMIN_PASSWORD}
+      - APP2_MONITOR_USER=${APP2_MONITOR_USER:-monitor_user}
+      - APP2_MONITOR_PASSWORD=${APP2_MONITOR_PASSWORD}
+      - APP2_DB_USER=${APP2_DB_USER:-user}
+      - APP2_DB_PASSWORD=${APP2_DB_PASSWORD}
+      - APP2_DB_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
     ports:
       - "6032:6032"
       - "6033:6033"
     healthcheck:
-      test: ["CMD", "mysql", "-h127.0.0.1", "-P6032", "-uadmin", "-padmin", "-e", "SELECT 1"]
+      test: ["CMD", "mysql", "-h127.0.0.1", "-P6032", "-u${APP2_PROXY_ADMIN_USER:-admin}", "-p${APP2_PROXY_ADMIN_PASSWORD}", "-e", "SELECT 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -55,10 +65,15 @@ services:
 
   app2_orchestrator:
     build: ./app2_orchestrator
+    environment:
+      - APP2_ORCH_USER=${APP2_ORCH_USER:-orch_user}
+      - APP2_ORCH_PASSWORD=${APP2_ORCH_PASSWORD}
+      - APP2_PROXY_ADMIN_USER=${APP2_PROXY_ADMIN_USER:-admin}
+      - APP2_PROXY_ADMIN_PASSWORD=${APP2_PROXY_ADMIN_PASSWORD}
     ports:
       - "3000:3000"
     volumes:
-      - ./app2_orchestrator/orchestrator.conf.json:/etc/orchestrator.conf.json
+      - ./app2_orchestrator/orchestrator.conf.json:/etc/orchestrator.conf.json.template:ro
       - ./app2_orchestrator/scripts/:/scripts/
       - app2_orchestrator_data:/var/lib/orchestrator
     healthcheck:
@@ -76,6 +91,9 @@ services:
     build: ./app2_orchestrator
     environment:
       - ORCHESTRATOR_API=http://app2_orchestrator:3000/api
+      - APP2_DB_ROOT_PASSWORD=${APP2_DB_ROOT_PASSWORD}
+      - APP2_REPL_USER=${APP2_REPL_USER:-repl_user}
+      - APP2_REPL_PASSWORD=${APP2_REPL_PASSWORD}
     volumes:
       - ./app2_scripts/setup_replication.sh:/setup_replication.sh
     command: ["/bin/sh", "-c", "chmod +x /setup_replication.sh && /setup_replication.sh"]
@@ -100,10 +118,16 @@ services:
       - MYSQL_DATABASE=${APP2_DB_NAME}
       - MYSQL_USER=${APP2_DB_USER}
       - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
+      - APP2_REPL_USER=${APP2_REPL_USER:-repl_user}
+      - APP2_REPL_PASSWORD=${APP2_REPL_PASSWORD}
+      - APP2_ORCH_USER=${APP2_ORCH_USER:-orch_user}
+      - APP2_ORCH_PASSWORD=${APP2_ORCH_PASSWORD}
+      - APP2_MONITOR_USER=${APP2_MONITOR_USER:-monitor_user}
+      - APP2_MONITOR_PASSWORD=${APP2_MONITOR_PASSWORD}
     volumes:
       - ./app2_mariadb/conf/my.cnf:/etc/mysql/my.cnf
-      - ./app2_mariadb/init_cluster.sql:/docker-entrypoint-initdb.d/init_cluster.sql
-      - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
+      - ./app2_mariadb/init_cluster.sh:/docker-entrypoint-initdb.d/01_init_cluster.sh
+      - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/02_init_app.sql
       - app2_db1_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}"]
@@ -120,10 +144,16 @@ services:
       - MYSQL_DATABASE=${APP2_DB_NAME}
       - MYSQL_USER=${APP2_DB_USER}
       - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
+      - APP2_REPL_USER=${APP2_REPL_USER:-repl_user}
+      - APP2_REPL_PASSWORD=${APP2_REPL_PASSWORD}
+      - APP2_ORCH_USER=${APP2_ORCH_USER:-orch_user}
+      - APP2_ORCH_PASSWORD=${APP2_ORCH_PASSWORD}
+      - APP2_MONITOR_USER=${APP2_MONITOR_USER:-monitor_user}
+      - APP2_MONITOR_PASSWORD=${APP2_MONITOR_PASSWORD}
     volumes:
       - ./app2_mariadb/conf/my.cnf:/etc/mysql/my.cnf
-      - ./app2_mariadb/init_cluster.sql:/docker-entrypoint-initdb.d/init_cluster.sql
-      - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
+      - ./app2_mariadb/init_cluster.sh:/docker-entrypoint-initdb.d/01_init_cluster.sh
+      - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/02_init_app.sql
       - app2_db2_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}"]
@@ -140,10 +170,16 @@ services:
       - MYSQL_DATABASE=${APP2_DB_NAME}
       - MYSQL_USER=${APP2_DB_USER}
       - MYSQL_PASSWORD=${APP2_DB_PASSWORD}
+      - APP2_REPL_USER=${APP2_REPL_USER:-repl_user}
+      - APP2_REPL_PASSWORD=${APP2_REPL_PASSWORD}
+      - APP2_ORCH_USER=${APP2_ORCH_USER:-orch_user}
+      - APP2_ORCH_PASSWORD=${APP2_ORCH_PASSWORD}
+      - APP2_MONITOR_USER=${APP2_MONITOR_USER:-monitor_user}
+      - APP2_MONITOR_PASSWORD=${APP2_MONITOR_PASSWORD}
     volumes:
       - ./app2_mariadb/conf/my.cnf:/etc/mysql/my.cnf
-      - ./app2_mariadb/init_cluster.sql:/docker-entrypoint-initdb.d/init_cluster.sql
-      - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/init_app.sql
+      - ./app2_mariadb/init_cluster.sh:/docker-entrypoint-initdb.d/01_init_cluster.sh
+      - ./app2_mariadb/init.sql:/docker-entrypoint-initdb.d/02_init_app.sql
       - app2_db3_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${APP2_DB_USER}", "-p${APP2_DB_PASSWORD}"]
@@ -202,9 +238,9 @@ services:
       - INSTANCE_NAME=app1_replica1
       - PORT=8080
       - DB_HOST=haproxy
-      - DB_USER=postgres
-      - DB_PASSWORD=***REMOVED***
-      - DB_NAME=ticketflow
+      - DB_USER=${APP1_DB_USER:-postgres}
+      - DB_PASSWORD=${APP1_DB_PASSWORD}
+      - DB_NAME=${APP1_DB_NAME:-ticketflow}
     depends_on:
       - haproxy
     networks:
@@ -224,9 +260,9 @@ services:
       - INSTANCE_NAME=app1_replica2
       - PORT=8080
       - DB_HOST=haproxy
-      - DB_USER=postgres
-      - DB_PASSWORD=***REMOVED***
-      - DB_NAME=ticketflow
+      - DB_USER=${APP1_DB_USER:-postgres}
+      - DB_PASSWORD=${APP1_DB_PASSWORD}
+      - DB_NAME=${APP1_DB_NAME:-ticketflow}
     depends_on:
       - haproxy
     networks:
@@ -244,6 +280,8 @@ services:
     environment:
       - PATRONI_NAME=patroni_master
       - PATRONI_ETCD_HOST=etcd:2379
+      - PATRONI_SUPERUSER_PASSWORD=${APP1_DB_PASSWORD}
+      - PATRONI_REPLICATION_PASSWORD=${APP1_PATRONI_REPLICATION_PASSWORD}
     volumes:
       - patroni_master_data:/var/lib/postgresql/data/patroni
     networks:
@@ -257,6 +295,8 @@ services:
     environment:
       - PATRONI_NAME=patroni_slave
       - PATRONI_ETCD_HOST=etcd:2379
+      - PATRONI_SUPERUSER_PASSWORD=${APP1_DB_PASSWORD}
+      - PATRONI_REPLICATION_PASSWORD=${APP1_PATRONI_REPLICATION_PASSWORD}
     volumes:
       - patroni_slave_data:/var/lib/postgresql/data/patroni
     networks:
@@ -280,7 +320,6 @@ services:
     depends_on:
       - patroni_master
       - patroni_slave
-      # I removed the dependency on mariadb_master here because it will be managed by app2_proxysql
 
   # ========================================
   # APP3 & MIDDLEWARE

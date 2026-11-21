@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, session, g, render_template, redirect, url_for, flash
+from flask import Blueprint, request, session, g, render_template, redirect, url_for, flash
 from .services import AuthService, TicketService
 
 auth_bp = Blueprint('auth', __name__)

@@ -342,7 +342,7 @@ docker-compose restart app1_replica1
 # Conectarse vía HAProxy (recomendado)
 psql -h localhost -p 5432 -U postgres -d ticketflow
 
-# Password: ***REMOVED***
+# Password: según APP1_DB_PASSWORD en .env (por defecto ver .env.example)
 
 # Conectarse directamente al master
 docker exec -it app1_patroni_master psql -U postgres -d ticketflow
@@ -367,16 +367,16 @@ docker exec ticketflow_rabbitmq rabbitmqctl list_connections
 ## 🔐 Credenciales
 
 ### PostgreSQL (App1)
-- **Usuario**: postgres
-- **Password**: ***REMOVED***
-- **Database**: ticketflow
-- **Puerto**: 5432
+- **Usuario**: postgres (variable `APP1_DB_USER`)
+- **Password**: Ver archivo `.env` (`APP1_DB_PASSWORD`)
+- **Database**: ticketflow (`APP1_DB_NAME`)
+- **Puerto**: 5432 (HAProxy) / 8008 (Patroni REST)
 
 ### MariaDB (App2)
-- **Usuario**: Ver archivo `.env`
-- **Password**: Ver archivo `.env`
-- **Database**: Ver archivo `.env`
-- **Puerto**: 3306
+- **Usuario**: Ver archivo `.env` (`APP2_DB_USER`)
+- **Password**: Ver archivo `.env` (`APP2_DB_PASSWORD`)
+- **Database**: Ver archivo `.env` (`APP2_DB_NAME`)
+- **Puerto**: 3306 (ProxySQL expuesto en 6033; admin en 6032)
 
 ### RabbitMQ
 - **Usuario**: guest
@@ -386,45 +386,65 @@ docker exec ticketflow_rabbitmq rabbitmqctl list_connections
 ## 📁 Estructura del Proyecto
 
 ```
-Proy3_SD/
-├── app1/                       # App1 - Gestor de Reservas (Go)
+ticketflow-sistemas-distribuidos/
+├── app1/                       # App1 - Gestor de Reservas (Go + Patroni)
 │   ├── backend/
 │   │   ├── main.go            # Código principal Go
 │   │   ├── go.mod             # Dependencias
 │   │   └── go.sum             # Checksums
 │   ├── frontend/
 │   │   └── index.html         # Frontend web
+│   ├── db/                    # Patroni cluster PostgreSQL
+│   │   ├── Dockerfile
+│   │   ├── entrypoint.sh
+│   │   └── patroni.yml
 │   ├── Dockerfile             # Build de App1
 │   ├── nginx.conf             # Config Load Balancer
-│   ├── haproxy.cfg            # Config PostgreSQL LB
-│   └── docker-compose.yml     # Compose específico App1
-├── app2/                       # App2 - Facturación (Python)
+│   └── haproxy.cfg            # Config PostgreSQL / MariaDB routing
+├── app2/                       # App2 - Facturación (Python / Flask)
 │   ├── app/
-│   │   ├── models.py          # Modelos de Datos
+│   │   ├── models.py          # Modelos de Datos (SQLAlchemy)
 │   │   ├── services.py        # Lógica de Negocio
-│   │   ├── routes.py          # Controladores Web
-│   │   └── socket_listener.py # Consumidor RabbitMQ
+│   │   ├── routes.py          # Controladores Web (Auth & Tickets)
+│   │   ├── middleware_adapters.py # Adaptadores TCP Socket / Server
+│   │   ├── notification_client.py # Cliente de notificaciones a middleware
+│   │   └── socket_listener.py # Listener de tickets TCP
 │   ├── run.py                 # Entrypoint Web
 │   ├── run_listener.py        # Entrypoint Listener
 │   └── Dockerfile
-├── app3/                       # App3 - Portal de Venta
+├── app2_mariadb/               # Cluster MariaDB (Master + Replicas)
+│   ├── conf/my.cnf            # Configuración GTID y replicación
+│   ├── Dockerfile
+│   ├── init_cluster.sh        # Script de inicialización de usuarios HA
+│   └── init.sql               # Esquema de tablas de facturación
+├── app2_nginx_lb/              # Balanceador Nginx para App2
+│   └── nginx.conf
+├── app2_orchestrator/          # Gestor de topología Orchestrator
+│   ├── Dockerfile
+│   ├── entrypoint.sh
+│   ├── orchestrator.conf.json
+│   └── scripts/proxy-failover.sh
+├── app2_proxysql/              # ProxySQL para Read/Write split y failover
+│   ├── conf/proxysql.cnf
+│   └── entrypoint.sh
+├── app2_scripts/               # Scripts de configuración de replicación
+│   └── setup_replication.sh
+├── app3/                       # App3 - Portal de Venta (Flask)
 │   ├── app.py
 │   ├── templates/
 │   │   ├── index.html
 │   │   └── seats.html
 │   └── Dockerfile
-├── middleware/                 # Middleware - Orquestador (Go)
+├── middleware/                 # Middleware - Orquestador (Go + RabbitMQ)
 │   ├── main.go
 │   ├── go.mod
 │   └── Dockerfile
-├── mariadb/                    # Configuración MariaDB
-│   ├── Dockerfile
-│   └── init.sql
 ├── diagramas/                  # Diagramas del sistema
 │   └── app2/                   # Diagramas específicos App2
 ├── docker-compose.yml          # Orquestación completa
 ├── .env.example                # Ejemplo de variables de entorno
 ├── README.md                   # Esta documentación
+├── AGENTS.md                   # Guía de contexto para agentes
 ├── Proyecto3.pdf              # Enunciado
 └── Informe de contexto.pdf    # Contexto del proyecto
 ```

@@ -1,5 +1,4 @@
 import json
-import os
 from .services import TicketService
 from .middleware_adapters import get_middleware_adapter
 

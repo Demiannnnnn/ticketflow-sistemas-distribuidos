@@ -1,4 +1,3 @@
-from datetime import datetime
 from .models import db, User, Ticket, Payment, TicketStatus
 from .notification_client import NotificationClient
 
@@ -19,7 +18,7 @@ class AuthService:
     @staticmethod
     def login(email, password):
         user = User.query.filter_by(email=email).first()
-        # Verificar que exista, que tenga password setead (no sea placeholder) y que el password coincida
+        # Verificar que exista, que tenga password seteada (no sea placeholder) y que el password coincida
         if user and user.password_hash and user.check_password(password):
             return user
         return None

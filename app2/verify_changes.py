@@ -1,9 +1,7 @@
 
-import sys
-import os
 import unittest
 from app import create_app, db
-from app.models import User, Ticket, TicketStatus, Payment
+from app.models import User, Ticket, TicketStatus
 from app.services import AuthService, TicketService
 
 class TestSequenceCompliance(unittest.TestCase):

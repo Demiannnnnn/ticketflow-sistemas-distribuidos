@@ -25,11 +25,11 @@ fi
 
 # Nota: Por simplicidad, hacemos un "Reset" basándonos en el nuevo master.
 
-PROXY_ADMIN_USER="admin"
-PROXY_ADMIN_PASS="admin"
+PROXY_ADMIN_USER="${APP2_PROXY_ADMIN_USER:-admin}"
+PROXY_ADMIN_PASS="${APP2_PROXY_ADMIN_PASSWORD}"
 PROXY_HOST="app2_proxysql"
 
-mysql -u$PROXY_ADMIN_USER -p$PROXY_ADMIN_PASS -h $PROXY_HOST -P 6032 <<EOF
+mysql -u"$PROXY_ADMIN_USER" -p"$PROXY_ADMIN_PASS" -h "$PROXY_HOST" -P 6032 <<EOF
 -- Mover el nuevo master a HG 10
 UPDATE mysql_servers SET hostgroup_id=10 WHERE hostname='$SUCCESSOR_HOST';
 
