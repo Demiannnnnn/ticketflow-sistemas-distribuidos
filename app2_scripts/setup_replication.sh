@@ -2,9 +2,9 @@
 
 echo "Iniciando configuración de replicación de MariaDB y Orchestrator..."
 
-DB_ROOT_PASS="***REMOVED***" # Ajustar según .env
-REPL_USER="repl_user"
-REPL_PASS="repl_password"
+DB_ROOT_PASS="${APP2_DB_ROOT_PASSWORD}"
+REPL_USER="${APP2_REPL_USER:-repl_user}"
+REPL_PASS="${APP2_REPL_PASSWORD}"
 
 wait_for_db() {
     host=$1

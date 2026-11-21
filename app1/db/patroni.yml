@@ -39,10 +39,10 @@ postgresql:
   authentication:
     replication:
       username: replicator
-      password: replicator_password
+      password: {{replication_password}}
     superuser:
       username: postgres
-      password: ***REMOVED***
+      password: {{superuser_password}}
     parameters:
       unix_socket_directories: '.'
 
