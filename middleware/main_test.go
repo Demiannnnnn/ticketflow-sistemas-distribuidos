@@ -59,6 +59,7 @@ func TestOrderRechazaDatosInvalidosSinPublicar(t *testing.T) {
 		"sin event_id":      `{"user_id":"1","quantity":1}`,
 		"sin user_id":       `{"event_id":"1","quantity":1}`,
 		"quantity cero":     `{"event_id":"1","user_id":"1","quantity":0}`,
+		"quantity negativa": `{"event_id":"1","user_id":"1","quantity":-1}`,
 		"quantity no int":   `{"event_id":"1","user_id":"1","quantity":"uno"}`,
 		"event_id numérico": `{"event_id":1,"user_id":"1","quantity":1}`,
 	}

@@ -263,11 +263,17 @@ func getEvents(c *gin.Context) {
 	var events []map[string]interface{}
 	for rows.Next() {
 		var id, totalSeats, availableSeats int
-		var name, venue, date, description string
+		var name, venue, date string
+		var description sql.NullString
 		err := rows.Scan(&id, &name, &venue, &date, &totalSeats, &description, &availableSeats)
 		if err != nil {
 			log.Printf("Error escaneando evento: %v", err)
 			continue
+		}
+
+		desc := ""
+		if description.Valid {
+			desc = description.String
 		}
 
 		events = append(events, map[string]interface{}{
@@ -276,7 +282,7 @@ func getEvents(c *gin.Context) {
 			"venue":           venue,
 			"date":            date,
 			"total_seats":     totalSeats,
-			"description":     description,
+			"description":     desc,
 			"available_seats": availableSeats,
 		})
 	}
